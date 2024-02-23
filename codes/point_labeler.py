@@ -21,15 +21,9 @@ def create_bodypart_colormap(body_keypoints):
 
 
 class PointLabeler:
-    def __init__(self, video_data):
-        self.video_data = video_data
-        self.select_frame = None  # default, defined in label_points
-        self.body_keypoints = []  # default, defined in label_points
-        self.selected_points = {}
-        # Stores the positions of each body part for each frame
-        self.keypoint_positions = {}  # { frame_number: { keypoint: (x, y), ...}, ... }
-
-        # TODO: as class argument?
+    def __init__(self):
+        self.select_frame = None
+        self.frame = None
         full_set_body_keypoints = ['nose',
                                    'head bottom', 'head top',
                                    'left ear', 'right ear',
@@ -39,16 +33,20 @@ class PointLabeler:
                                    'left hip', 'right hip',
                                    'left knee', 'right knee',
                                    'left ankle', 'right ankle']
-
+        self.body_keypoints = full_set_body_keypoints  # default, defined in label_points
         self.max_n_points = len(full_set_body_keypoints)
         self.colormap = create_bodypart_colormap(full_set_body_keypoints)
         self.fig, self.ax_image, self.ax_list = None, None, None
 
-    def setup_figure(self):
+        self.selected_points = {}
+        # # Stores the positions of each body part for each frame
+        # self.keypoint_positions = {}  # { frame_number: { keypoint: (x, y), ...}, ... }
+
+    def setup_figure(self, frame):
         fig = plt.figure(figsize=(20, 10))
         ax_image = fig.add_subplot(121)
         ax_list = fig.add_subplot(122)
-        ax_image.imshow(self.video_data.video[self.select_frame])
+        ax_image.imshow(frame)  # self.video_data.video[self.select_frame])
         ax_image.axis('off')
         ax_image.set_title('Click to select points. \n Spacebar to skip points. \n Afterwards, press enter to close '
                            'the figure.')
@@ -72,7 +70,7 @@ class PointLabeler:
         Redraws the points on the image.
         """
         self.ax_image.clear()
-        self.ax_image.imshow(self.video_data.video[self.select_frame])
+        self.ax_image.imshow(self.frame) #self.video_data.video[self.select_frame])
         for keypoint in self.body_keypoints:
             if keypoint in self.selected_points:
                 point = self.selected_points[keypoint]
@@ -103,7 +101,8 @@ class PointLabeler:
             plt.close(self.fig)
         self.redraw_points()
 
-    def label_points(self, frame_index, task='extreme_keypoints'):
+    def label_points(self, frame, frame_index, task='extreme_keypoints'):
+        self.frame = frame
         self.select_frame = frame_index
         self.selected_points = {}  # reinitialise each time
 
@@ -131,17 +130,17 @@ class PointLabeler:
         self.max_n_points = len(self.body_keypoints)
         # self.colormap = viz_utils.get_colors(self.max_n_points)  # TODO: always same colormap
 
-        self.fig, self.ax_image, self.ax_list = self.setup_figure()
+        self.fig, self.ax_image, self.ax_list = self.setup_figure(frame)
 
         cid_mouse = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
 
         plt.show()
 
-        self.keypoint_positions[frame_index] = self.selected_points
+        # self.keypoint_positions[frame_index] = self.selected_points
 
     def get_labels(self, frame_index):
-        return self.keypoint_positions.get(frame_index, None)
+        return self.selected_points
 
     # def label_all_points(self, frame_number):
     #     pass

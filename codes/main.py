@@ -61,33 +61,33 @@ def main():
                 print(f'Video ID: {video_id}, frame: {frame_index}, point labels: {point_label}')
 
 
-    for video_id in video_manager.videos:
-        frame_index = 0
-        print(f'Processing video {video_id}: tracking and cropping')
-        video_data = video_manager.get_video_data(video_id)
-        video = video_data.video
-
-        point_label = video_manager.get_point_labels(video_id, frame_index)
-
-        # track the points and update extreme_coordinates
-        video_manager.update_extreme_coordinates(video_id, tracker, video, frame_index, point_label)
-        extreme_coords = video_manager.get_extreme_coordinates(video_id)
-        if extreme_coords is not None:
-            leftmost, topmost, rightmost, bottommost = extreme_coords
-            print('extreme coords', leftmost, topmost, rightmost, bottommost)
-
-        tracks, visibles = video_manager.get_tracking_data(video_id, frame_index)
-        print('saved tracks and visibles', tracks.shape, visibles.shape)
-
-        # Visualize tracks and save corresponding video
-        video_viz = viz_utils.paint_point_track(video, tracks, visibles)
-        fps_value = video.metadata.fps
-        bps_value = video.metadata.bps
-        file_path = os.path.join('output', f'tracked_points_{task}_video_{video_id}_frame_{frame_index}.mp4')
-        print(f'wrote video {video_id} with tracked labels to', file_path)
-        media.write_video(file_path, video_viz, fps=fps_value, bps=bps_value)
-
-        video_manager.crop_and_resize_video(video_id, 256, 256)
+    # for video_id in video_manager.videos:
+    #     frame_index = 0
+    #     print(f'Processing video {video_id}: tracking and cropping')
+    #     video_data = video_manager.get_video_data(video_id)
+    #     video = video_data.video
+    #
+    #     point_label = video_manager.get_point_labels(video_id, frame_index)
+    #
+    #     # track the points and update extreme_coordinates
+    #     video_manager.update_extreme_coordinates(video_id, tracker, video, frame_index, point_label)
+    #     extreme_coords = video_manager.get_extreme_coordinates(video_id)
+    #     if extreme_coords is not None:
+    #         leftmost, topmost, rightmost, bottommost = extreme_coords
+    #         print('extreme coords', leftmost, topmost, rightmost, bottommost)
+    #
+    #     tracks, visibles = video_manager.get_tracking_data(video_id, frame_index)
+    #     print('saved tracks and visibles', tracks.shape, visibles.shape)
+    #
+    #     # Visualize tracks and save corresponding video
+    #     video_viz = viz_utils.paint_point_track(video, tracks, visibles)
+    #     fps_value = video.metadata.fps
+    #     bps_value = video.metadata.bps
+    #     file_path = os.path.join('output', f'tracked_points_{task}_video_{video_id}_frame_{frame_index}.mp4')
+    #     print(f'wrote video {video_id} with tracked labels to', file_path)
+    #     media.write_video(file_path, video_viz, fps=fps_value, bps=bps_value)
+    #
+    #     video_manager.crop_and_resize_video(video_id, 256, 256)
 
     # Preprocessing
     # keypoint tracing

@@ -1,12 +1,15 @@
+import csv
+import json
 import math
 import mediapy as media
 import numpy as np
 import os
 
 from PIL import Image
+from point_labeler import PointLabeler
 
 
-# TODO: reorganise and rename st that consistent with existing info in video_data.video.metadata
+# TODO: move static functions to utils
 def expand2square(pil_img, background_color):
     width, height = pil_img.size
     if width == height:
@@ -44,97 +47,78 @@ def find_extreme_coordinates(tracks, visibles):
     return leftmost, topmost, rightmost, bottommost
 
 
+def get_patient_data_from_filename(filename):
+    """
+    Get age group and health status based on video filename
+
+    Args:
+        filename (str): Name of the video file.
+    """
+
+    categories = {
+        'N': {'age_group': 'younger', 'health_status': 'normal'},
+        'PR': {'age_group': 'younger', 'health_status': 'abnormal'},
+        'FN': {'age_group': 'older', 'health_status': 'normal'},
+        'F-': {'age_group': 'older', 'health_status': 'abnormal'}
+    }
+
+    group = os.path.splitext(filename)[0].split('_')[1]
+    age_group = categories[group]['age_group'] if group in categories else None
+    health_status = categories[group]['health_status'] if group in categories else None
+
+    return age_group, health_status
+
+
 class VideoManager:
     def __init__(self):
-        # Stores both video data and metadata
-        self.videos = {}  # Format: { video_id: { "data": VideoData, "metadata": VideoMetadata }, ... }
-        self.point_labels = {}  # Stores point labels for each video {video_id: {frame_index: labels}}
-        self.tracking_data = {}  # Stores tracking data {video_id: {frame_index: (tracks, visibles)}} #TODO: change tracks, visible to dict
-        self.extreme_coordinates = {}  # Format: {video_id: (leftmost, topmost, rightmost, bottommost)}
+        # Stores videos
+        self.video_collection = {}  # Format: { video_id: VideoObject, ... }
 
-    def add_all_videos(self, folder):
-        categories = {
-            'AI_GeMo_early_N': {'age_group': 'younger', 'health_status': 'normal'},
-            'AI_GeMo_early_PR': {'age_group': 'younger', 'health_status': 'abnormal'},
-            'AI_GeMo_late_FN': {'age_group': 'older', 'health_status': 'normal'},
-            'AI_GeMo_late_F-': {'age_group': 'older', 'health_status': 'abnormal'}
-        }
+    def add_video(self, filepath, load_now=False, add_pt_data=False):
+        filename = os.path.basename(filepath)
+        video_id = filename.split('_')[0]
 
-        for category, info in categories.items():
-            print(category)
-            subfolder_path = os.path.join(folder, category)
-            print(subfolder_path)
-            for filename in os.listdir(subfolder_path):
-                print(filename)
-                if filename.lower().endswith('.mp4'):  # Add other video formats if needed
-                    video_id = filename.split('_')[0]
-                    file_path = os.path.join(subfolder_path, filename)
-                    print(file_path)
-                    video_metadata = VideoMetadata(video_id,
-                                                   file_path,
-                                                   info['age_group'],
-                                                   info['health_status'])
+        if load_now:
+            video = media.read_video(filepath)
+        else:
+            video = None
 
-                    video = media.read_video(file_path)
-                    video_data = VideoData(video)
+        if add_pt_data:
+            age_group, health_status = get_patient_data_from_filename(filename)
+            patient_data = PatientData(age_group, health_status)
+        else:
+            patient_data = None
 
-                    self.videos[video_id] = {"data": video_data, "metadata": video_metadata}
-            break  # TODO: remove break (only loading first category for development)
+        self.video_collection[video_id] = VideoObject(filepath, video, patient_data)
 
-    # def add_video(self, file_path):
-    #     
-    #     video_data = VideoData(video_array, height, width)
-    #     video_metadata = VideoMetadata(video_id, file_path, age_group, health_status)
-    #     self.videos[video_id] = {"data": video_data, "metadata": video_metadata}
+    def add_all_videos(self, folder, load_now=False, add_pt_data=False):
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                if file.lower().endswith('.mp4'):
+                    self.add_video(os.path.join(root, file), load_now, add_pt_data)
 
-    def get_video_data(self, video_id):
-        video = self.videos.get(video_id, None)
-        return video["data"] if video else None
+    def get_all_video_ids(self):
+        return list(self.video_collection.keys())
 
-    def get_video_metadata(self, video_id):
-        video = self.videos.get(video_id, None)
-        return video["metadata"] if video else None
+    def get_video_object(self, video_id):
+        video_object = self.video_collection.get(video_id, None)
+        return video_object if video_object else None
 
     def remove_video(self, video_id):
-        if video_id in self.videos:
-            del self.videos[video_id]
+        if video_id in self.video_collection:
+            del self.video_collection[video_id].video
 
     def show_video(self, video_id):
-        vid = self.videos.get(video_id, None)
+        vid = self.video_collection.get(video_id, None)
         media.show_video(vid.video, fps=vid.fps)
 
-    def save_point_labels(self, video_id, frame_index, labels):
-        if video_id not in self.point_labels:
-            self.point_labels[video_id] = {}
-        self.point_labels[video_id][frame_index] = labels
-
-    def get_point_labels(self, video_id, frame_index):
-        return self.point_labels.get(video_id, {}).get(frame_index, None)
-
-    def save_tracking_data(self, video_id, frame_index, tracks, visibles):
-        if video_id not in self.tracking_data:
-            self.tracking_data[video_id] = {}
-        self.tracking_data[video_id][frame_index] = (tracks, visibles)
-
-    def get_tracking_data(self, video_id, frame_index):
-        return self.tracking_data.get(video_id, {}).get(frame_index, (None, None))
-
-    def update_extreme_coordinates(self, video_id, tracker, video, frame_index, point_label):
-        tracks, visibles = tracker.track_selected_points(video, frame_index, point_label)
-        self.save_tracking_data(video_id, frame_index, tracks, visibles)
-        extreme_coords = find_extreme_coordinates(tracks, visibles)
-        self.extreme_coordinates[video_id] = extreme_coords
-
-    def get_extreme_coordinates(self, video_id):
-        return self.extreme_coordinates.get(video_id, None)
-
     def crop_and_resize_video(self, video_id, resize_height, resize_width):
-        video = self.get_video_data(video_id).video
+        video = self.get_video_object(video_id).video
         height, width = video.metadata.shape
         fps_value = video.metadata.fps
         bps_value = video.metadata.bps
 
-        x_min, y_max, x_max, y_min = self.get_extreme_coordinates(video_id)
+        x_min, y_max, x_max, y_min = video.get_extreme_coordinates(video_id)
 
         # Get spread of selected points
         x_spread = x_max - x_min
@@ -185,17 +169,86 @@ class VideoManager:
               os.path.join('output', 'cropped_videos', f'cropped_resized_vid_{video_id}.mp4'))
 
 
-class VideoData:
-    def __init__(self, video, fps=30):
-        self.video = video
-        self.height, self.width = video.shape[1:3]
-        self.n_frames = video.metadata.num_images
-        self.fps = video.metadata.fps
-
-
-class VideoMetadata:
-    def __init__(self, video_id, file_path, age_group, health_status):
-        self.video_id = video_id
+class VideoObject:
+    def __init__(self, file_path, video=None, patient_data=None):
         self.file_path = file_path
+        self.video = video  # a VideoArray object
+
+        self.patient_data = patient_data
+
+        self.keypoint_labels = {}  # Stores point labels for each video {frame_index: labels, ...}
+        self.tracking_data = {}  # Stores tracking data {frame_index: (tracks, visibles)} #TODO: change
+        self.extreme_coordinates = {}  # Format: {leftmost: , topmost: , rightmost: , bottommost: }
+
+    def load_video(self):
+        """
+        Loads the video in the VideoObject if there is no video yet.
+        """
+        if not self.video:
+            self.video = media.read_video(self.file_path)
+
+    def release_video(self):
+        if self.video is not None:
+            self.video = None
+
+    def add_keypoint_labels(self, frame_index, labels):
+        self.keypoint_labels[frame_index] = labels
+
+    def get_keypoint_labels(self, frame_index):
+        return self.keypoint_labels[frame_index]
+
+    def label_and_store_keypoints(self, frame_index):
+        # Assuming video_object is loaded and accessible
+        video_frame = self.video[frame_index]
+
+        point_labeler = PointLabeler()
+        point_labeler.label_points(video_frame, frame_index, task='extreme_keypoints')
+
+        self.add_keypoint_labels(frame_index, point_labeler.selected_points)
+
+    def save_keypoints_to_csv(self, filename):
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ['frame', 'keypoint', 'x_coord', 'y_coord']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for frame, points in self.keypoint_labels.items():
+                for keypoint, coords in points.items():
+                    writer.writerow({
+                        'frame': frame,
+                        'keypoint': keypoint,
+                        'x_coord': coords[0],
+                        'y_coord': coords[1]
+                    })
+
+    def save_keypoints_to_json(self, filename):
+        # Convert NumPy arrays to lists
+        for frame, points in self.keypoint_labels.items():
+            for keypoint, coords in points.items():
+                self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
+
+        # Write to JSON file
+        with open(filename, 'w') as f:
+            json.dump(self.keypoint_labels, f, indent=4)
+    def save_tracking_data(self, video_id, frame_index, tracks, visibles):
+        if video_id not in self.tracking_data:
+            self.tracking_data[video_id] = {}
+        self.tracking_data[video_id][frame_index] = (tracks, visibles)
+
+    def get_tracking_data(self, video_id, frame_index):
+        return self.tracking_data.get(video_id, {}).get(frame_index, (None, None))
+
+    def update_extreme_coordinates(self, video_id, tracker, video, frame_index, point_label):
+        tracks, visibles = tracker.track_selected_points(video, frame_index, point_label)
+        self.save_tracking_data(video_id, frame_index, tracks, visibles)
+        extreme_coords = find_extreme_coordinates(tracks, visibles)
+        self.extreme_coordinates[video_id] = extreme_coords
+
+    def get_extreme_coordinates(self, video_id):
+        return self.extreme_coordinates.get(video_id, None)
+
+
+class PatientData:
+    def __init__(self, age_group, health_status):
         self.age_group = age_group
         self.health_status = health_status
