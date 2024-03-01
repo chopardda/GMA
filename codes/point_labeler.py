@@ -11,10 +11,10 @@ from tapnet.utils import viz_utils
 
 def create_bodypart_colormap(body_keypoints):
     # Use a matplotlib colormap
-    colormap = sns.color_palette("hls", len(body_keypoints))  # 'tab20' is a good palette for distinct colors
+    colorpalette = sns.color_palette("hls", len(body_keypoints))  # 'tab20' is a good palette for distinct colors
 
     bodypart_colors = {
-        body_keypoints[i]: colormap[i] for i in range(len(body_keypoints))
+        body_keypoints[i]: colorpalette[i] for i in range(len(body_keypoints))
     }
 
     return bodypart_colors

@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES = 0 # TODO: use GPU
+CUDA_VISIBLE_DEVICES = 0  # TODO: use GPU
 
 import os
 import sys
@@ -13,53 +13,94 @@ from point_labeler import PointLabeler
 from point_tracker import PointTracker
 from video_manager import VideoManager
 
-from tapnet.utils import transforms
-from tapnet.utils import viz_utils
 
-# import os
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'  # 0 = all logs shown
-
-# from keypoint_detector import KeypointDetector
-# from video_cropper import VideoCropper
-# from point_tracker import PointTracker
-# from point_merger import PointMerger
-# from feature_extractor import FeatureExtractor
-
+# TODO: all paths or as arguments!
 
 def main():
-    video_folder = "/home/daphne/Documents/GMA/data/video_few_samples"
-    video_manager = VideoManager()
+    video_folder = "/home/daphne/Documents/GMA/data/Preprocessed_Videos"
+    labeled_keypoints_folder = "/home/daphne/Documents/GMA/codes/output/labelled_points"
+    tracked_keypoints_folder = "/home/daphne/Documents/GMA/codes/output/labelled_points"
+    cropped_videos_folder = "/home/daphne/Documents/GMA/data/Preprocessed_Videos/Cropped_Videos"
 
-    # Process videos in sub-folders and extract metadata
-    video_manager.add_all_videos(video_folder)
+    video_manager = VideoManager()
+    video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
     # Create point tracker
     tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy')
 
-    # Preprocessing
-    task = 'extreme_keypoints'
+    # video_ids = video_manager.get_all_video_ids()
+    video_ids = ['18_FN_c', '07_F-_c']
 
-    # Now, iterate over the videos in the manager and process each one
-    for video_id in video_manager.videos:
-        print(f"Processing video {video_id}: labelling")
-        video_data = video_manager.get_video_data(video_id)
-        video = video_data.video
+    # --- Track extreme coordinates for cropping
+    for video_id in video_ids:
+        # print(f"\n{'=' * 60}")
+        print(f"Keypoint tracking for video {video_id}...")
+        # print(f"{'=' * 60}\n")
+        video_object = video_manager.get_video_object(video_id)
 
-        if video_data is not None:
-            # Instantiate PointLabeler
-            point_labeler = PointLabeler(video_data)
+        # Define starting frame and tracking task (which keypoints to track)
+        frame_index = 0
+        task = 'extreme_keypoints'
 
-            # ToDo (optional): as long as some point is still (None, None) for all labeled frames, ask to label a frame at random
-            desired_frame_indices = [0] #, video.metadata.num_images-1]  # first and last frame
+        # Load video
+        video_object.load_video()
 
-            # Label points at different timeframes
-            for frame_index in desired_frame_indices:
-                point_labeler.label_points(frame_index, task)
-                video_manager.save_point_labels(video_id, frame_index, point_labeler.get_labels(frame_index))
+        # Track points
+        try:
+            tracks, visibles = video_object.track_points(
+                tracker,
+                frame_index,
+                task,
+                labeled_keypoints_folder,
+                'json'
+            )
+        except ValueError as e:
+            print(e)  # Handle the error appropriately
 
-                point_label = video_manager.get_point_labels(video_id, frame_index)
-                print(f'Video ID: {video_id}, frame: {frame_index}, point labels: {point_label}')
+        # Save tracked points
+        video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
+        video_object.save_tracked_points_to_json(tracked_keypoints_folder)
 
+    # --- Crop videos according to tracked points
+    for video_id in video_ids:
+        print(f"Cropping and resizing video {video_id}...")
+        video_object = video_manager.get_video_object(video_id)
+
+        # -- Update extreme coordinates from tracked points (either already loaded or from files)
+        # #- Option A: explicitly load the tracked point and update the coordinates
+        # video_object.load_tracked_points_from_folder(tracked_keypoints_folder, 'json')
+        # video_object.update_extreme_coordinates()
+
+        # - Option B: implicitly load the tracked points when updating the coordinates.
+        # Note: not needed if extreme_coordinated already loaded in video_object
+        video_object.update_extreme_coordinates(tracked_keypoints_folder)
+        print(video_object.extreme_coordinates)
+
+        # -- Crop video and save to cropped_videos folder
+        video_object.crop_and_resize_video(cropped_videos_folder, resize=True, load_and_release_video=True)
+
+
+
+    # # Now, iterate over the videos in the manager and process each one
+    # for video_id in video_manager.video_collection:
+    #     print(f"Processing video {video_id}: labelling")
+    #     video_data = video_manager.get_video_data(video_id)
+    #     video = video_data.video
+    #
+    #     if video_data is not None:
+    #         # Instantiate PointLabeler
+    #         point_labeler = PointLabeler(video_data)
+    #
+    #         # ToDo (optional): as long as some point is still (None, None) for all labeled frames, ask to label a frame at random
+    #         desired_frame_indices = [0] #, video.metadata.num_images-1]  # first and last frame
+    #
+    #         # Label points at different timeframes
+    #         for frame_index in desired_frame_indices:
+    #             point_labeler.label_points(frame_index, task)
+    #             video_manager.save_point_labels(video_id, frame_index, point_labeler.get_labels(frame_index))
+    #
+    #             point_label = video_manager.get_point_labels(video_id, frame_index)
+    #             print(f'Video ID: {video_id}, frame: {frame_index}, point labels: {point_label}')
 
     # for video_id in video_manager.videos:
     #     frame_index = 0
