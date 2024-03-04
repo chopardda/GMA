@@ -9,3 +9,5 @@ Setting up jax to work with GPU is a bit tricky:
 1. Create conda environment: `conda env create -f environment.yml`
 2. Install jax with GPU support: `pip install --upgrade pip`, `pip install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html`
 3. Install other dependencies: `pip install -r requirements.txt`
+
+Note that the environment variable `XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1` might need to be set, if the CUDA version does not match exactly
