@@ -8,14 +8,14 @@ sys.path.append(parent_directory)
 
 from video_manager import VideoManager
 
-video_folder = "/home/daphne/Documents/GMA/data/Preprocessed_Videos"
-output_folder = "/home/daphne/Documents/GMA/codes/output"
+video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
+output_folder = "./output"
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
-video_ids = video_manager.get_all_video_ids()
-# video_ids = ['18_FN_c', '07_F-_c']
+# video_ids = video_manager.get_all_video_ids()
+video_ids = ['18_FN_c', '07_F-_c']
 
 for video_id in video_ids:
     print(f"Labelling process for video {video_id}...")
