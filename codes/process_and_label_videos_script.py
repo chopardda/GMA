@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -7,6 +8,14 @@ parent_directory = os.path.dirname(current_script_path)
 sys.path.append(parent_directory)
 
 from video_manager import VideoManager
+
+# Create ArgumentParser object
+parser = argparse.ArgumentParser(description='Process and label videos.')
+# Add 'task' argument
+parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
+                    help='Task for labeling keypoints.')
+
+args = parser.parse_args()
 
 video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
 output_folder = "./output/labeled"
@@ -29,7 +38,7 @@ for video_id in video_ids:
 
     # -- Label video
     frame_index = 0
-    video_object.label_and_store_keypoints(frame_index, task='extreme_keypoints')
+    video_object.label_and_store_keypoints(frame_index, task=args.task)
 
     # -- Save labelled points to file
     video_object.save_keypoints_to_csv(output_folder)
