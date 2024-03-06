@@ -137,6 +137,8 @@ class VideoObject:
         self.tracking_data = {}  # Stores tracked points {'point': [{'x': x_val, 'y':y_val, 'visible': bool), ...], ...}
         self.extreme_coordinates = {}  # Format: {leftmost: , topmost: , rightmost: , bottommost: }
 
+        self.labeling_task = None
+
     def load_video(self):
         """
         Loads the video in the VideoObject if there is no video loaded yet.
@@ -213,9 +215,13 @@ class VideoObject:
         point_labeler.label_points(video_frame, frame_index, task=task)
 
         self.add_keypoint_labels(frame_index, point_labeler.selected_points)
+        self.labeling_task = task
 
-    def save_keypoints_to_csv(self, filename):
-        with open(filename, 'w', newline='') as csvfile:
+    def _get_filename(self, format):
+        return f"{self.video_id}_{self.labeling_task}.{format}"
+
+    def save_keypoints_to_csv(self, output_dir):
+        with open(os.path.join(output_dir, self._get_filename('csv')), 'w', newline='') as csvfile:
             fieldnames = ['frame', 'keypoint', 'x_coord', 'y_coord']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -229,27 +235,30 @@ class VideoObject:
                         'y_coord': coords[1]
                     })
 
-    def save_keypoints_to_json(self, filename):
+    def save_keypoints_to_json(self, output_dir):
         # Convert NumPy arrays to lists
         for frame, points in self.keypoint_labels.items():
             for keypoint, coords in points.items():
                 self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
 
         # Write to JSON file
-        with open(filename, 'w') as f:
+        with open(os.path.join(output_dir, self._get_filename('json')), 'w') as f:
             json.dump(self.keypoint_labels, f, indent=4)
 
-    def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, file_type='json'):
-        file_types = {'csv': '.csv', 'json': '.json'}
+    def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
+        file_types = ['csv', 'json']
 
         if file_type not in file_types:
-            raise ValueError(f"Invalid file_type: {file_type}. Must be one of {list(file_types.keys())}")
+            raise ValueError(f"Invalid file_type: {file_type}. Must be one of {file_types}")
 
-        file_path = os.path.join(labeled_keypoints_folder, f'{self.video_id}{file_types[file_type]}')
+        self.labeling_task = task
+
+        file_path = os.path.join(labeled_keypoints_folder, self._get_filename(file_type))
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(
-                f"No labeled keypoints file found for video ID '{self.video_id}' with file type '{file_type}'.")
+                f"No labeled keypoints file found for video ID '{self.video_id}' with task '{task}' and "
+                f"file type '{file_type}'.")
 
         if file_type == 'json':
             with open(file_path, 'r') as f:
@@ -306,7 +315,7 @@ class VideoObject:
         # Ensure keypoint labels are loaded for the frame_index
         if frame_index not in self.keypoint_labels:
             if labeled_keypoints_folder:
-                self.load_keypoint_labels_from_folder(labeled_keypoints_folder, file_type)
+                self.load_keypoint_labels_from_folder(labeled_keypoints_folder, task, file_type)
             else:
                 raise ValueError(f"Keypoint labels for frame {frame_index} are not already loaded, "
                                  f"please provide labelled keypoint folder.")

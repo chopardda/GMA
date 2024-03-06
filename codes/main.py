@@ -30,6 +30,16 @@ def main():
     cropped_videos_folder = "./output/cropped"
     resized_videos_folder = "./output/resized"
 
+    # Ensure output directories exist
+    if not os.path.exists(tracked_keypoints_folder):
+        os.makedirs(tracked_keypoints_folder)
+
+    if not os.path.exists(cropped_videos_folder):
+        os.makedirs(cropped_videos_folder)
+
+    if not os.path.exists(resized_videos_folder):
+        os.makedirs(resized_videos_folder)
+
     video_manager = VideoManager()
     video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
