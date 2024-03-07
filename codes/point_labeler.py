@@ -107,6 +107,22 @@ class PointLabeler:
         self.selected_points = {}  # reinitialise each time
 
         # -- Predefined body parts
+        self._set_body_keypoints(task)
+
+        self.max_n_points = len(self.body_keypoints)
+        # self.colormap = viz_utils.get_colors(self.max_n_points)  # TODO: always same colormap
+
+        self.fig, self.ax_image, self.ax_list = self.setup_figure(frame)
+        self.redraw_points()
+
+        cid_mouse = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+        cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+
+        plt.show()
+
+        # self.keypoint_positions[frame_index] = self.selected_points
+
+    def _set_body_keypoints(self, task='extreme_keypoints'):
         if task == 'extreme_keypoints':
             self.body_keypoints = ['head top',
                                    'left elbow', 'right elbow',
@@ -126,19 +142,6 @@ class PointLabeler:
         else:
             raise ValueError(
                 "task {} not recognized. Valid options are 'extreme_keypoints' and 'all_body_keypoints'.".format(task))
-
-        self.max_n_points = len(self.body_keypoints)
-        # self.colormap = viz_utils.get_colors(self.max_n_points)  # TODO: always same colormap
-
-        self.fig, self.ax_image, self.ax_list = self.setup_figure(frame)
-        self.redraw_points()
-
-        cid_mouse = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
-        cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
-
-        plt.show()
-
-        # self.keypoint_positions[frame_index] = self.selected_points
 
     def get_labels(self, frame_index):
         return self.selected_points
