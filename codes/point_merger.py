@@ -50,8 +50,8 @@ class PointMerger(PointLabeler):
                 self.ax_image.plot(point['x'], point['y'], 'o', color=color_palette[i])
 
             self.ax_image.axis('off')
-            self.update_list(self.ax_list)
 
+        self.update_list(self.ax_list)
         plt.draw()
 
     def on_key(self, event):
