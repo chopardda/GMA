@@ -48,7 +48,7 @@ class PointLabeler:
         ax_list = fig.add_subplot(122)
         ax_image.imshow(frame)  # self.video_data.video[self.select_frame])
         ax_image.axis('off')
-        ax_image.set_title('Click to select points. \n Spacebar to skip points. \n Afterwards, press enter to close '
+        fig.suptitle('Click to select points. \n Spacebar to skip points. \n Afterwards, press enter to close '
                            'the figure.')
         ax_list.axis('off')
         self.update_list(ax_list)
