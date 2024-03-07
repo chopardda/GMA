@@ -4,10 +4,12 @@ import math
 import mediapy as media
 import numpy as np
 import os
+import glob
 
 from collections import defaultdict
 from PIL import Image
 from point_labeler import PointLabeler
+from point_merger import PointMerger
 
 
 # TODO: move static functions to utils
@@ -113,6 +115,12 @@ class VideoManager:
         return list(self.video_collection.keys())
 
     def get_video_object(self, video_id):
+        """
+        Get the VideoObject instance for the given video ID.
+
+        Returns:
+            VideoObject: The VideoObject instance for the given video ID, or None if no such video exists.
+        """
         video_object = self.video_collection.get(video_id, None)
         return video_object if video_object else None
 
@@ -177,7 +185,7 @@ class VideoObject:
                 # Try showing the video again after loading
                 if self.video is not None:
                     media.show_video(self.video, fps=self.video.metadata.fps)
-                    self.release_video() # if video was loaded automatically, release it afterwards
+                    self.release_video()  # if video was loaded automatically, release it afterwards
                 else:
                     # Video still not loaded after attempt
                     raise NoVideoLoadedError("Failed to automatically load the video.")
@@ -217,11 +225,19 @@ class VideoObject:
         self.add_keypoint_labels(frame_index, point_labeler.selected_points)
         self.labeling_task = task
 
-    def _get_filename(self, format):
-        return f"{self.video_id}_{self.labeling_task}.{format}"
+    def _get_filename(self, format, tag=None):
+        if tag is None:
+            return f"{self.video_id}.{self.labeling_task}.{format}"
 
-    def save_keypoints_to_csv(self, output_dir):
-        with open(os.path.join(output_dir, self._get_filename('csv')), 'w', newline='') as csvfile:
+        else:
+            return f"{self.video_id}.{self.labeling_task}.{tag}.{format}"
+
+    def _get_filename_with_tag_wildcard(self, format):
+        # Return a string which can be used to glob files with the same video_id and task but different tags
+        return f"{self.video_id}.{self.labeling_task}.*.{format}"
+
+    def save_keypoints_to_csv(self, output_dir, tag=None):
+        with open(os.path.join(output_dir, self._get_filename('csv', tag)), 'w', newline='') as csvfile:
             fieldnames = ['frame', 'keypoint', 'x_coord', 'y_coord']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -235,14 +251,14 @@ class VideoObject:
                         'y_coord': coords[1]
                     })
 
-    def save_keypoints_to_json(self, output_dir):
+    def save_keypoints_to_json(self, output_dir, tag=None):
         # Convert NumPy arrays to lists
         for frame, points in self.keypoint_labels.items():
             for keypoint, coords in points.items():
                 self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
 
         # Write to JSON file
-        with open(os.path.join(output_dir, self._get_filename('json')), 'w') as f:
+        with open(os.path.join(output_dir, self._get_filename('json', tag)), 'w') as f:
             json.dump(self.keypoint_labels, f, indent=4)
 
     def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
@@ -261,14 +277,19 @@ class VideoObject:
                 f"file type '{file_type}'.")
 
         if file_type == 'json':
-            with open(file_path, 'r') as f:
-                self.keypoint_labels = json.load(f)
-            # frame index must be read as int, not string
-            self.keypoint_labels = {int(frame_index): keypoints
-                                    for frame_index, keypoints in self.keypoint_labels.items()}
+            self.keypoint_labels = self._load_keypoints_from_json(file_path)
 
         elif file_type == 'csv':
-            self._load_keypoints_from_csv(file_path)
+            self.keypoint_labels = self._load_keypoints_from_csv(file_path)
+
+    def _load_keypoints_from_json(self, json_file_path):
+        with open(json_file_path, 'r') as f:
+            keypoint_labels = json.load(f)
+
+        # frame index must be read as int, not string
+        keypoint_labels = {int(frame_index): keypoints for frame_index, keypoints in keypoint_labels.items()}
+
+        return keypoint_labels
 
     def _load_keypoints_from_csv(self, csv_file_path):
         keypoint_labels = {}
@@ -282,10 +303,37 @@ class VideoObject:
                 if frame_index not in keypoint_labels:
                     keypoint_labels[frame_index] = {}
                 keypoint_labels[frame_index][keypoint] = np.array([x_coord, y_coord])
-        self.keypoint_labels = keypoint_labels
+
+        return keypoint_labels
 
     def save_tracking_data(self, frame_index, tracks, visibles):
         self.tracking_data[frame_index] = (tracks, visibles)
+
+    def load_labeled_keypoint_sets(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
+        # Glob all label sets for the video
+        self.labeling_task = task
+        matching_files = glob.glob(
+            os.path.join(labeled_keypoints_folder, self._get_filename_with_tag_wildcard(file_type)))
+
+        # Load the labeled keypoint sets from the folder and return them
+        labeled_keypoint_sets = {}
+
+        for file in matching_files:
+            # Parse the tag out of the filename
+            tag = os.path.basename(file).split('.')[2]
+
+            if file_type == 'json':
+                labeled_keypoint_sets[tag] = self._load_keypoints_from_json(file)
+            elif file_type == 'csv':
+                labeled_keypoint_sets[tag] = self._load_keypoints_from_csv(file)
+
+        return labeled_keypoint_sets
+
+    def merge_points(self, point_sets, frame_index, task='extreme_keypoints'):
+        point_merger = PointMerger()
+        point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task)
+        self.add_keypoint_labels(frame_index, point_merger.selected_points)
+        self.labeling_task = task
 
     def track_points(self, tracker, frame_index, task, labeled_keypoints_folder=None, file_type='json'):
         """

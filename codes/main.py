@@ -25,7 +25,7 @@ def main():
     args = parser.parse_args()
 
     video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
-    labeled_keypoints_folder = "./output/labeled"
+    labeled_keypoints_folder = "./output/merged"
     tracked_keypoints_folder = "./output/tracked"
     cropped_videos_folder = "./output/cropped"
     resized_videos_folder = "./output/resized"

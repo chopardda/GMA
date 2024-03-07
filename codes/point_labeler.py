@@ -131,6 +131,7 @@ class PointLabeler:
         # self.colormap = viz_utils.get_colors(self.max_n_points)  # TODO: always same colormap
 
         self.fig, self.ax_image, self.ax_list = self.setup_figure(frame)
+        self.redraw_points()
 
         cid_mouse = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
