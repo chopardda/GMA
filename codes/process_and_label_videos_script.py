@@ -17,14 +17,15 @@ parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'
                     help='Task for labeling keypoints.')
 parser.add_argument('--tag', default=f"{os.environ.get('USER')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     help='Tag for the output files.')
-parser.add_argument('--relabel', default=False,
+parser.add_argument('--relabel', action='store_false',
                     help='Specifies whether to relabel keypoints in videos that are already labeled. '
                          'If set, videos with existing labels will be labeled one more time with a different filename. '
                          'By default, existing labels in videos are preserved and not replaced.')
 parser.add_argument('--video_path', default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
                     help='Path to folder containing videos.')
 parser.add_argument('--output_path', default='./output/labeled',
-                    help='Path to folder containing videos.')
+                    help='Path to output directory for saving labelled data files.')
+
 args = parser.parse_args()
 
 video_folder = args.video_path
