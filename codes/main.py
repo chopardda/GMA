@@ -2,7 +2,6 @@ CUDA_VISIBLE_DEVICES = 0  # TODO: use GPU
 
 import os
 import sys
-import mediapy as media
 import argparse
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
@@ -10,7 +9,6 @@ parent_directory = os.path.dirname(current_script_path)
 
 sys.path.append(parent_directory)
 
-from point_labeler import PointLabeler
 from point_tracker import PointTracker
 from video_manager import VideoManager
 
@@ -19,16 +17,29 @@ from video_manager import VideoManager
 
 def main():
     parser = argparse.ArgumentParser(description='Process videos.')
-    parser.add_argument('--track_only', action='store_true', help='Track keypoints only')
-    parser.add_argument('--crop_resize_only', action='store_true', help='Crop and resize videos only')
+    parser.add_argument('--track_only', action='store_true',
+                        help='Track keypoints only')
+    parser.add_argument('--crop_resize_only', action='store_true',
+                        help='Crop and resize videos only')
+    parser.add_argument('--video_path',
+                        default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                        help='Path to directory containing videos.')
+    parser.add_argument('--labeled_kp_path', default='./output/merged',
+                        help='Path to directory containing merged labelled keypoints to use for cropping.')
+    parser.add_argument('--tracked_kp_path', default='./output/tracked',
+                        help='Path to output directory to save tracked keypoints later uses for cropping.')
+    parser.add_argument('--cropped_videos_path', default='./output/cropped',
+                        help='Path to output directory to save cropped videos.')
+    parser.add_argument('--resized_videos_path', default='./output/resized',
+                        help='Path to output directory to save cropped and resized videos.')
 
     args = parser.parse_args()
 
-    video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
-    labeled_keypoints_folder = "./output/merged"
-    tracked_keypoints_folder = "./output/tracked"
-    cropped_videos_folder = "./output/cropped"
-    resized_videos_folder = "./output/resized"
+    video_folder = args.video_path
+    labeled_keypoints_folder = args.labeled_kp_path
+    tracked_keypoints_folder = args.tracked_kp_path
+    cropped_videos_folder = args.cropped_videos_path
+    resized_videos_folder = args.resized_videos_path
 
     # Ensure output directories exist
     if not os.path.exists(tracked_keypoints_folder):
