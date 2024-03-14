@@ -244,18 +244,22 @@ class VideoObject:
             writer.writeheader()
             for frame, points in self.keypoint_labels.items():
                 for keypoint, coords in points.items():
-                    writer.writerow({
-                        'frame': frame,
-                        'keypoint': keypoint,
-                        'x_coord': coords[0],
-                        'y_coord': coords[1]
-                    })
+                    # alternative: replace with placeholder value e.g. float('nan')
+                    # x_coord, y_coord = (coords if coords is not None else (float('nan'), float('nan')))
+                    if coords is not None:
+                        writer.writerow({
+                            'frame': frame,
+                            'keypoint': keypoint,
+                            'x_coord': coords[0],
+                            'y_coord': coords[1]
+                        })
 
     def save_keypoints_to_json(self, output_dir, tag=None):
         # Convert NumPy arrays to lists
         for frame, points in self.keypoint_labels.items():
             for keypoint, coords in points.items():
-                self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
+                if coords is not None:
+                    self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
 
         # Write to JSON file
         with open(os.path.join(output_dir, self._get_filename('json', tag)), 'w') as f:
