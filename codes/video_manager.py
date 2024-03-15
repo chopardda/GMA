@@ -333,9 +333,9 @@ class VideoObject:
 
         return labeled_keypoint_sets
 
-    def merge_points(self, point_sets, frame_index, task='extreme_keypoints'):
+    def merge_points(self, point_sets, frame_index, task='extreme_keypoints', auto_accept_single=False):
         point_merger = PointMerger()
-        point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task)
+        point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task, auto_accept_single)
         self.add_keypoint_labels(frame_index, point_merger.selected_points)
         self.labeling_task = task
 

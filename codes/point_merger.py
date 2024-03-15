@@ -107,22 +107,27 @@ class PointMerger(PointLabeler):
             _, average_point = self._get_current_labeled_and_average_points()
             self.selected_points[keypoint] = np.array(average_point)
 
-    def merge_points(self, frame, frame_index, point_sets, task='extreme_keypoints'):
+    def merge_points(self, frame, frame_index, point_sets, task='extreme_keypoints', auto_accept_single=False):
         self.selected_point_sets = point_sets
         self.accept_all_points = False
         self.frame = frame
         self.select_frame = frame_index
+        self._set_body_keypoints(task)
+        self._merge_all_points()
 
-        # Show initial figure
-        self.show_initial_figure(frame, task)
+        # Skip the overview if we are accepting all points and there is only one point set
+        if auto_accept_single and len(self.selected_point_sets) == 1:
+            return
 
-        if not self.accept_all_points:
-            self.label_points(frame, frame_index, task)
+        else:
+            # Show initial figure
+            self.show_initial_figure(frame, task)
+
+            if not self.accept_all_points:
+                self.label_points(frame, frame_index, task)
 
     def show_initial_figure(self, frame, task):
-        self._set_body_keypoints(task)
         self.fig, self.ax_image, self.ax_list = self.setup_overview_figure(frame)
         cid_key = self.fig.canvas.mpl_connect('key_press_event', self.overview_on_key)
-        self._merge_all_points()
         super().redraw_points()
         plt.show()

@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='Merge point label sets.')
 # Add 'task' argument
 parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
                     help='Task for labeling keypoints.')
+parser.add_argument("--accept_single", action="store_true", default=False, help="Accept single label sets")
 
 args = parser.parse_args()
 
@@ -43,7 +44,7 @@ for video_id in video_ids:
     print(f"Found {len(label_sets)} label sets")
 
     # -- Merge each labeled frame set
-    video_object.merge_points(label_sets, 0, args.task)
+    video_object.merge_points(label_sets, 0, args.task, args.accept_single)
 
     # -- Save merged points to file
     video_object.save_keypoints_to_csv(merged_folder)
