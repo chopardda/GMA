@@ -576,10 +576,18 @@ class VideoObject:
         if load_and_release_video:
             self.release_video()
 
-    def get_tracked_points_distribution(self, frame_index):
-        # Calculate the difference between successive frames for each tracked point based on the frame_index
-        # and return the mean and standard deviation of these differences
+    def get_tracked_points_deltas(self, frame_index):
+        # Return the difference between successive frames for each tracked point based on the frame_index
+        assert frame_index in self.tracking_data, f"No tracked points found for frame {frame_index}"
 
+        frame_deltas = { keypoint: [] for keypoint in self.tracking_data[frame_index] }
+        for keypoint, data_list in self.tracking_data[frame_index].items():
+            for i, data in enumerate(data_list[:-1]):
+                x_diff = abs(data['x'] - data_list[i+1]['x'])
+                y_diff = abs(data['y'] - data_list[i+1]['y'])
+                frame_deltas[keypoint].append((x_diff, y_diff))
+
+        return frame_deltas
 
 
 #################################################
