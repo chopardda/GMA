@@ -128,6 +128,9 @@ class VideoManager:
         if video_id in self.video_collection:
             del self.video_collection[video_id].video
 
+    def load_all_tracked_points(self, tracked_keypoints_folder, file_type='json'):
+        for video_id, video_object in self.video_collection.items():
+            video_object.load_tracked_points_from_folder(tracked_keypoints_folder, file_type)
 
 #################################################
 ############# VideoObject Class ################
@@ -572,6 +575,11 @@ class VideoObject:
         # release video from memory after processing it
         if load_and_release_video:
             self.release_video()
+
+    def get_tracked_points_distribution(self, frame_index):
+        # Calculate the difference between successive frames for each tracked point based on the frame_index
+        # and return the mean and standard deviation of these differences
+
 
 
 #################################################
