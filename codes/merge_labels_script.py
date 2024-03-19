@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description='Merge point label sets.')
 # Add 'task' argument
 parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
                     help='Task for labeling keypoints.')
-parser.add_argument("--accept_single", action="store_true", default=False, help="Accept single label sets")
+parser.add_argument("--accept_single", action="store_true", default=True, help="Accept single label sets")
 parser.add_argument('--video_folder',
                     default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
                     help='Path to directory containing videos.')

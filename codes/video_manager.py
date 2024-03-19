@@ -265,12 +265,11 @@ class VideoObject:
           the method uses the instance's keypoint_labels attribute.
         """
         keypoints_dict = keypoints_to_save if keypoints_to_save is not None else self.keypoint_labels
-        print(keypoints_to_save, keypoints_dict)
 
         # Ensure coordinates are integers before saving
         keypoints_dict = {
             frame: {
-                keypoint: {'x': int(coords['x']), 'y': int(coords['y'])}
+                keypoint: {'x': int(coords[0]), 'y': int(coords[1])}
                 for keypoint, coords in frame_points.items() if coords is not None
             }
             for frame, frame_points in keypoints_dict.items()
@@ -279,7 +278,7 @@ class VideoObject:
         # Write to JSON file
         filename = os.path.join(output_dir, self._get_filename('json', tag))
         with open(filename, 'w') as f:
-            json.dump(self.keypoint_labels, f, indent=4)
+            json.dump(keypoints_dict, f, indent=4)
 
     def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
         file_types = ['csv', 'json']

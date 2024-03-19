@@ -17,7 +17,7 @@ parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'
                     help='Task for labeling keypoints.')
 parser.add_argument('--tag', default=f"{os.environ.get('USER')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     help='Tag for the output files.')
-parser.add_argument('--relabel', action='store_false',
+parser.add_argument('--relabel', action='store_true', default=False,
                     help='Specifies whether to relabel keypoints in videos that are already labeled. '
                          'If set, videos with existing labels will be labeled one more time with a different filename. '
                          'By default, existing labels in videos are preserved and not replaced.')
