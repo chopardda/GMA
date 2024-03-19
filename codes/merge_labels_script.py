@@ -16,12 +16,19 @@ parser = argparse.ArgumentParser(description='Merge point label sets.')
 parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
                     help='Task for labeling keypoints.')
 parser.add_argument("--accept_single", action="store_true", default=False, help="Accept single label sets")
+parser.add_argument('--video_folder',
+                    default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    help='Path to directory containing videos.')
+parser.add_argument('--labeled_kp_path', default='./output/labeled',
+                    help='Path to directory containing merged labelled keypoints to use for cropping.')
+parser.add_argument('--merged_path', default='./output/merged',
+                    help='Path to output directory to save tracked keypoints later uses for cropping.')
 
 args = parser.parse_args()
 
-video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
-labeled_folder = "./output/labeled"
-merged_folder = "./output/merged"
+video_folder = args.video_folder
+labeled_folder = args.labeled_kp_path
+merged_folder = args.merged_path
 
 if not os.path.exists(merged_folder):
     os.makedirs(merged_folder, exist_ok=True)
