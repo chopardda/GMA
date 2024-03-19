@@ -254,15 +254,31 @@ class VideoObject:
                             'y_coord': coords[1]
                         })
 
-    def save_keypoints_to_json(self, output_dir, tag=None):
-        # Convert NumPy arrays to lists
-        for frame, points in self.keypoint_labels.items():
-            for keypoint, coords in points.items():
-                if coords is not None:
-                    self.keypoint_labels[frame][keypoint] = {'x': int(coords[0]), 'y': int(coords[1])}
+    def save_keypoints_to_json(self, output_dir, tag=None, keypoints_to_save=None):
+        """
+        Saves keypoints to a JSON file. Can save adjusted (cropped) keypoints if provided.
+
+        Parameters:
+        - output_dir: Directory to save the JSON file.
+        - tag: Optional tag to include in the filename.
+        - adjusted_keypoints: Optional dictionary of adjusted keypoints. If not provided,
+          the method uses the instance's keypoint_labels attribute.
+        """
+        keypoints_dict = keypoints_to_save if keypoints_to_save is not None else self.keypoint_labels
+        print(keypoints_to_save, keypoints_dict)
+
+        # Ensure coordinates are integers before saving
+        keypoints_dict = {
+            frame: {
+                keypoint: {'x': int(coords['x']), 'y': int(coords['y'])}
+                for keypoint, coords in frame_points.items() if coords is not None
+            }
+            for frame, frame_points in keypoints_dict.items()
+        }
 
         # Write to JSON file
-        with open(os.path.join(output_dir, self._get_filename('json', tag)), 'w') as f:
+        filename = os.path.join(output_dir, self._get_filename('json', tag))
+        with open(filename, 'w') as f:
             json.dump(self.keypoint_labels, f, indent=4)
 
     def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
@@ -278,7 +294,7 @@ class VideoObject:
         if not os.path.exists(file_path):
             raise FileNotFoundError(
                 f"No labeled keypoints file found for video ID '{self.video_id}' with task '{task}' and "
-                f"file type '{file_type}'.")
+                f"file type '{file_type}'. {file_path} doesn't exist.")
 
         if file_type == 'json':
             self.keypoint_labels = self._load_keypoints_from_json(file_path)
@@ -531,8 +547,29 @@ class VideoObject:
         min_y_crop, max_y_crop = (max(0, y_min - largest_margin - 1),
                                   min(height, y_max + largest_margin + 1))
 
-        cropped_width = max_x_crop - min_x_crop
-        cropped_height = max_y_crop - min_y_crop
+        # -- Get the labelled keypoints in the cropped video coordinates
+        cropped_keypoint_labels = {
+            frame: {
+                keypoint: {
+                    'x': coords['x'] - min_x_crop,
+                    'y': coords['y'] - min_y_crop
+                }
+                for keypoint, coords in frame_data.items()
+            }
+            for frame, frame_data in self.keypoint_labels.items()
+        }
+
+        # -- Save the keypoints in the cropped video coords to a file
+        output_dir = './output/labeled' #TODO: think about a more flexible way to do that
+        tag = 'cropped'
+        filename = os.path.join(output_dir, self._get_filename('json', tag))
+
+        self.save_keypoints_to_json(
+            output_dir=output_dir,
+            tag=tag,
+            keypoints_to_save=cropped_keypoint_labels
+        )
+        print(f'wrote labeled keypoints in cropped video coordinate space to {os.getcwd()}/{filename}')
 
         frames_original = self.video.__array__()
         frames_cropped = frames_original[:, min_y_crop:max_y_crop, min_x_crop:max_x_crop, :]
@@ -548,6 +585,7 @@ class VideoObject:
                 resized_frame = squared_frame.resize((resize_height, resize_width))
                 frames_crop_resized.append(np.asarray(resized_frame))
 
+        # Save cropped video to file
         filename_cropped = f'cropped_vid_{self.video_id}.mp4'
 
         media.write_video(
@@ -558,6 +596,7 @@ class VideoObject:
         )
         print('wrote cropped video to', os.path.join(cropped_folder, filename_cropped))
 
+        # Save cropped and resized video to file if argument is True
         if resize:
             filename_cropped_resized = f'cropped_resized_vid_{self.video_id}.mp4'
             media.write_video(
@@ -569,7 +608,7 @@ class VideoObject:
             print('wrote cropped and resized video to',
                   os.path.join(resize_folder, filename_cropped_resized))
 
-        # release video from memory after processing it
+        # Release video from memory after processing it
         if load_and_release_video:
             self.release_video()
 
