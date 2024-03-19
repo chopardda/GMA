@@ -4,7 +4,6 @@ import numpy as np
 from point_labeler import PointLabeler
 
 
-
 class PointMerger(PointLabeler):
     def __init__(self):
         super().__init__()
@@ -18,7 +17,7 @@ class PointMerger(PointLabeler):
         ax_image.imshow(frame)  # self.video_data.video[self.select_frame])
         ax_image.axis('off')
         fig.suptitle('Use the spacebar to accept the proposed merged point (in red). Click to define a new '
-                           'final point. \n Afterwards, press enter to close the figure.')
+                     'final point. \n Afterwards, press enter to close the figure.')
         ax_list.axis('off')
         self.update_list(ax_list)
         return fig, ax_image, ax_list
@@ -40,7 +39,7 @@ class PointMerger(PointLabeler):
         Redraws the points on the image.
         """
         self.ax_image.clear()
-        self.ax_image.imshow(self.frame) #self.video_data.video[self.select_frame])
+        self.ax_image.imshow(self.frame)  # self.video_data.video[self.select_frame])
 
         # Draw all already selected points
         for keypoint in self.body_keypoints:
@@ -92,9 +91,13 @@ class PointMerger(PointLabeler):
         labeled_points = []
         current_keypoint = self.body_keypoints[len(self.selected_points)]
         for k, v in self.selected_point_sets.items():
-            labeled_points.append(v[self.select_frame][current_keypoint])
+            point = v[self.select_frame][current_keypoint]
+            if point is not None:
+                labeled_points.append(point)
 
-        assert len(labeled_points) > 0, "No labeled points found for the current keypoint."
+        # Ensure there are visible/labeled points before calculating the average
+        if not labeled_points:
+            raise ValueError("No labeled points found for the current keypoint.")
 
         # Calculate the average point
         average_point = [sum([p['x'] for p in labeled_points]) / len(labeled_points),
