@@ -1,0 +1,10 @@
+frame,keypoint,x_coord,y_coord
+0,head top,439.0,251.0
+0,left elbow,756.0,678.0
+0,right elbow,240.0,748.0
+0,left wrist,816.0,743.0
+0,right wrist,132.0,728.0
+0,left knee,718.0,1344.0
+0,right knee,332.0,1189.0
+0,left ankle,723.0,1518.0
+0,right ankle,494.0,1344.0
