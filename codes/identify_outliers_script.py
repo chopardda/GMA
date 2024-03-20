@@ -15,7 +15,7 @@ from outlier_display import OutlierDisplay
 parser = argparse.ArgumentParser(description='Check for outlier points in the tracked data')
 # Add 'task' argument
 parser.add_argument("--stddev_threshold", type=float, default=3, help="Number of standard deviations from"
-                    " the mean to consider a point an outlier")
+                                                                      " the mean to consider a point an outlier")
 parser.add_argument("--show_outliers", action="store_true", default=False, help="Visually show detected"
                                                                                 "outliers")
 
@@ -28,7 +28,6 @@ video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 video_manager.load_all_tracked_points(tracked_folder)
 video_ids = video_manager.get_all_video_ids()
-
 
 print("Gathering video statistics...")
 frame_index = 0  # Use this later when we have more index frames
@@ -89,11 +88,16 @@ for video_id in video_ids:
         y_mean = keypoint_distributions[keypoint]["y_mean"]
         y_std = keypoint_distributions[keypoint]["y_std"]
 
-        x_outliers = np.where(np.abs(x_deltas - x_mean) > args.stddev_threshold * x_std)[0]
-        y_outliers = np.where(np.abs(y_deltas - y_mean) > args.stddev_threshold * y_std)[0]
+        x_diffs = np.abs(x_deltas - x_mean)
+        y_diffs = np.abs(y_deltas - y_mean)
+        x_outliers = np.where(x_diffs > args.stddev_threshold * x_std)[0]
+        y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
 
         outlier_set = set(x_outliers).union(set(y_outliers))
-        outliers[video_id][frame_index][keypoint] = outlier_set
+        outliers[video_id][frame_index][keypoint] = [
+            (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
+             y_diffs[i] / y_std) for i in
+            outlier_set]
         outlier_count += len(outlier_set)
 
 print(f"Found {outlier_count} outliers")
@@ -106,6 +110,6 @@ if args.show_outliers and len(outliers) > 0:
         od = OutlierDisplay(video_object)
 
         for frame_index in outliers[video_id]:
-            for keypoint, outlier_frames in outliers[video_id][frame_index].items():
-                for outlier_frame in outlier_frames:
-                    od.show_outlier(keypoint, frame_index, outlier_frame)
+            for keypoint, outlier_frame_info in outliers[video_id][frame_index].items():
+                for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
+                    od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
