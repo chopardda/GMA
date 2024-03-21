@@ -18,6 +18,8 @@ parser.add_argument("--stddev_threshold", type=float, default=3, help="Number of
                                                                       " the mean to consider a point an outlier")
 parser.add_argument("--show_outliers", action="store_true", default=False, help="Visually show detected"
                                                                                 "outliers")
+parser.add_argument("--save_figures", action="store_true", default=False, help="Save figures of detected"
+                                                                               "outliers")
 
 args = parser.parse_args()
 
@@ -107,9 +109,11 @@ if args.show_outliers and len(outliers) > 0:
         video_object = video_manager.get_video_object(video_id)
         video_object.load_video()
 
-        od = OutlierDisplay(video_object)
+        od = OutlierDisplay(video_object, save_figures=args.save_figures, stddev_threshold=args.stddev_threshold)
 
         for frame_index in outliers[video_id]:
             for keypoint, outlier_frame_info in outliers[video_id][frame_index].items():
                 for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
                     od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
+
+        od.write_outliers_to_file()
