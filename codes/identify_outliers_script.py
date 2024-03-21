@@ -117,3 +117,4 @@ if args.show_outliers and len(outliers) > 0:
                     od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
 
         od.write_outliers_to_file()
+        video_object.release_video()
