@@ -91,6 +91,8 @@ def main():
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
             video_object.save_tracked_points_to_json(tracked_keypoints_folder)
 
+            video_object.release_video()
+
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
