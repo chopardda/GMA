@@ -128,9 +128,19 @@ class VideoManager:
         if video_id in self.video_collection:
             del self.video_collection[video_id].video
 
-    def load_all_tracked_points(self, tracked_keypoints_folder, file_type='json'):
-        for video_id, video_object in self.video_collection.items():
-            video_object.load_tracked_points_from_folder(tracked_keypoints_folder, file_type)
+    def load_all_tracked_points(self, tracked_keypoints_folder, file_type='json', missing_ok=False):
+        video_keys = list(self.video_collection.keys())
+        for video_id in video_keys:
+            try:
+                self.video_collection[video_id].load_tracked_points_from_folder(tracked_keypoints_folder, file_type)
+
+            except FileNotFoundError as e:
+                if not missing_ok:
+                    raise FileNotFoundError(f"Error loading tracked points for video {video_id}: {e}")
+
+                else:
+                    # Remove video from collection
+                    self.video_collection.pop(video_id)
 
 #################################################
 ############# VideoObject Class ################
