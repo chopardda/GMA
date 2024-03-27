@@ -88,7 +88,7 @@ class VideoManager:
         # Stores videos
         self.video_collection = {}  # Format: { video_id: VideoObject, ... }
 
-    def add_video(self, filepath, load_now=False, add_pt_data=False):
+    def add_video(self, filepath, video_size, load_now=False, add_pt_data=False):
         filename = os.path.basename(filepath)
         video_id = os.path.splitext(filename)[0]
 
@@ -103,15 +103,19 @@ class VideoManager:
         else:
             patient_data = None
 
-        self.video_collection[video_id] = VideoObject(filepath, video_id, video, patient_data)
+        self.video_collection[video_id] = VideoObject(filepath, video_id, video_size, video, patient_data)
 
     def add_all_videos(self, folder, load_now=False, add_pt_data=False):
         for root, dirs, files in os.walk(folder):
             for file in files:
                 if file.lower().endswith('.mp4'):
-                    self.add_video(os.path.join(root, file), load_now, add_pt_data)
+                    full_filename = os.path.join(root, file)
+                    self.add_video(full_filename, os.path.getsize(full_filename), load_now, add_pt_data)
 
-    def get_all_video_ids(self):
+    def get_all_video_ids(self, sort=True):
+        if sort:
+            return sorted(list(self.video_collection.keys()), key=lambda x: int(self.video_collection[x].video_size))
+
         return list(self.video_collection.keys())
 
     def get_video_object(self, video_id):
@@ -137,10 +141,11 @@ class VideoManager:
 #################################################
 
 class VideoObject:
-    def __init__(self, file_path, video_id, video=None, patient_data=None):
+    def __init__(self, file_path, video_id, video_size, video=None, patient_data=None):
         self.file_path = file_path
         self.video_id = video_id
         self.video = video  # a VideoArray object
+        self.video_size = video_size
 
         self.patient_data = patient_data
 
