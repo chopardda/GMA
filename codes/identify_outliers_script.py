@@ -20,15 +20,17 @@ parser.add_argument("--show_outliers", action="store_true", default=False, help=
                                                                                 "outliers")
 parser.add_argument("--save_figures", action="store_true", default=False, help="Save figures of detected"
                                                                                "outliers")
+parser.add_argument('--tracked_kp_path', default='./output/tracked',
+                    help='Path to tracked keypoints')
+parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
 
 args = parser.parse_args()
 
 video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
-tracked_folder = "./output/tracked"
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
-video_manager.load_all_tracked_points(tracked_folder)
+video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
 video_ids = video_manager.get_all_video_ids()
 
 print("Gathering video statistics...")
@@ -41,7 +43,7 @@ for video_id in video_ids:
     for keypoint, deltas in video_frame_deltas.items():
         if keypoint not in keypoint_frame_deltas:
             keypoint_frame_deltas[keypoint] = []
-        keypoint_frame_deltas[keypoint].append(deltas)
+        keypoint_frame_deltas[keypoint] += deltas
 
 # Calculate distribution of point movement
 keypoint_distributions = {}
