@@ -59,14 +59,10 @@ def main():
 
     video_ids = video_manager.get_all_video_ids()
     # video_ids = ['18_FN_c', '07_F-_c']
-    skip_ids = ['09_FN_c', '48_FN_c', '36_FN_c', '07_PR_c', '17_N_c', '14_N_c']
 
     # --- Track extreme coordinates for cropping
     if not args.crop_resize_only:
         for video_id in video_ids:
-            if video_id in skip_ids:
-                continue
-
             # print(f"\n{'=' * 60}")
             print(f"Keypoint tracking for video {video_id}...")
             # print(f"{'=' * 60}\n")
@@ -100,8 +96,6 @@ def main():
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
-            if video_id in skip_ids:
-                continue
 
             print(f"Cropping and resizing video {video_id}...")
             video_object = video_manager.get_video_object(video_id)
