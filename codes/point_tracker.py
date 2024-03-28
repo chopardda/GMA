@@ -1,11 +1,14 @@
+import os
 import haiku as hk
 import jax
 import mediapy as media
 import numpy as np
 import tree
+from jaxlib.xla_extension import XlaRuntimeError
 
 from tapnet import tapir_model
 from tapnet.utils import transforms
+
 
 
 def build_model(frames, query_points):
@@ -94,16 +97,59 @@ def convert_select_point_dict_to_query_points(frame, points_dict):
 
 
 class PointTracker:
-    def __init__(self, checkpoint_path):
+    TEST_VIDEO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_video/test_video.mp4')
+    def __init__(self, checkpoint_path, frame_limit=None):
         self.checkpoint_path = checkpoint_path
         self.resize_height, self.resize_width = 256, 256
         self.model, self.params, self.state = self.initialize_model()
+
+        if type(frame_limit) == str and frame_limit.lower() == 'auto':
+            self.frame_limit = self._determine_GPU_limit(9)
+
+        elif type(frame_limit) == int:
+            self.frame_limit = frame_limit
+
+        else:
+            self.frame_limit = None
 
     def initialize_model(self):
         ckpt_state = np.load(self.checkpoint_path, allow_pickle=True).item()
         params, state = ckpt_state['params'], ckpt_state['state']
         model = hk.transform_with_state(build_model)
         return jax.jit(model.apply), params, state
+
+    def _determine_GPU_limit(self, num_points):
+        """
+        Determine the number of frames that can be tracked in on the current GPU for the given number of points.
+        """
+        # Use testing video to do a binary search to find the maximum number of frames that can be tracked at once
+        # TODO: find a better way to calculate this given the network architecture
+        video_frames = media.read_video(self.TEST_VIDEO)
+        num_frames = video_frames.shape[0]
+
+        low = 1
+        high = num_frames
+
+        print("Determining GPU limit...")
+
+        while low < high:
+            mid = (low + high) // 2
+            frames = preprocess_frames(video_frames[:mid])
+
+            try:
+                print(f"\tTrying {mid} frames...")
+                self.track_random_points(frames, num_points)
+                low = mid + 1
+            except XlaRuntimeError as e:
+                high = mid
+
+        del video_frames
+
+        print(f"Determined frame limit of {low} frames")
+
+        # Return the frame limit, minus a buffer
+        return low - 100
+
 
     def inference(self, frames, query_points):
         """Inference on one video.
@@ -124,7 +170,9 @@ class PointTracker:
 
         # Model inference
         rng = jax.random.PRNGKey(42)
+
         outputs, _ = self.model(self.params, self.state, rng, frames, query_points)
+
         outputs = tree.map_structure(lambda x: np.array(x[0]), outputs)
         tracks, occlusions, expected_dist = outputs['tracks'], outputs['occlusion'], outputs['expected_dist']
 
@@ -148,25 +196,68 @@ class PointTracker:
         else:
             frames = frames[select_frame:]  # Start from the selected frame to the end
 
-        # Convert from (x,y) to (t,y,x), where t = select_frame
-        query_points = convert_select_point_dict_to_query_points(select_frame, select_points)
+        if self.frame_limit is not None:
+            curr_frame = 0
+            end_frame = frames.shape[0]
+            tracks = np.empty((len(select_points), end_frame, 2), dtype=float)
+            visibles = np.empty((len(select_points), end_frame), dtype=bool)
+            curr_select_points = select_points
+            exit_loop = False
 
-        # From original image size to resized dimensions
-        query_points = transforms.convert_grid_coordinates(
-            query_points, (1, height, width), (1, self.resize_height, self.resize_width),
-            coordinate_format='tyx')
+            while True:
+                if curr_frame + self.frame_limit < end_frame:
+                    frames_chunk = frames[curr_frame:curr_frame + self.frame_limit]
+                else:
+                    exit_loop = True
+                    frames_chunk = frames[curr_frame:]
 
-        # Tracks has shape (n_keypoints, n_frames, 2) and visibles has shape (n_keypoints, n_frames)
-        tracks, visibles = self.inference(frames, query_points)
+                # Always use frame 0 for chunk processing
+                query_points = convert_select_point_dict_to_query_points(0, curr_select_points)
+                query_points = transforms.convert_grid_coordinates(
+                    query_points, (1, height, width), (1, self.resize_height, self.resize_width),
+                    coordinate_format='tyx')
 
-        # Reverse the tracks to match the original video order
-        if track_backward:
-            tracks = tracks[::-1]
-            visibles = visibles[::-1]
+                # Tracks has shape (n_keypoints, n_frames, 2) and visibles has shape (n_keypoints, n_frames)
+                chunk_tracks, chunk_visibles = self.inference(frames_chunk, query_points)
 
-        # From resized dimensions back to original image size
-        tracks = transforms.convert_grid_coordinates(tracks, (self.resize_height, self.resize_width),
-                                                     (width, height))
+                # From resized dimensions back to original image size
+                chunk_tracks = transforms.convert_grid_coordinates(chunk_tracks, (self.resize_height, self.resize_width),
+                                                             (width, height))
+
+                # Update the tracks and visibles
+                tracks[:, curr_frame:curr_frame + chunk_tracks.shape[1]] = chunk_tracks
+                visibles[:, curr_frame:curr_frame + chunk_visibles.shape[1]] = chunk_visibles
+
+                # Update the select points for the next chunk
+                curr_select_points = {key: chunk_tracks[i, -1] for i, key in enumerate(select_points)}
+
+                if exit_loop:
+                    break
+
+                else:
+                    curr_frame += self.frame_limit
+
+
+        else:
+            # Convert from (x,y) to (t,y,x), where t = select_frame
+            query_points = convert_select_point_dict_to_query_points(select_frame, select_points)
+
+            # From original image size to resized dimensions
+            query_points = transforms.convert_grid_coordinates(
+                query_points, (1, height, width), (1, self.resize_height, self.resize_width),
+                coordinate_format='tyx')
+
+            # Tracks has shape (n_keypoints, n_frames, 2) and visibles has shape (n_keypoints, n_frames)
+            tracks, visibles = self.inference(frames, query_points)
+
+            # Reverse the tracks to match the original video order
+            if track_backward:
+                tracks = tracks[::-1]
+                visibles = visibles[::-1]
+
+            # From resized dimensions back to original image size
+            tracks = transforms.convert_grid_coordinates(tracks, (self.resize_height, self.resize_width),
+                                                         (width, height))
 
         return tracks, visibles
 

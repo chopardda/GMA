@@ -55,7 +55,7 @@ def main():
     video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
     # Create point tracker
-    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy')
+    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', 'auto')
 
     video_ids = video_manager.get_all_video_ids()
     # video_ids = ['18_FN_c', '07_F-_c']
