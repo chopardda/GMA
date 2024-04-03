@@ -55,7 +55,7 @@ def main():
     video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
     # Create point tracker
-    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy')
+    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', 'auto')
 
     video_ids = video_manager.get_all_video_ids()
     # video_ids = ['18_FN_c', '07_F-_c']
@@ -91,9 +91,12 @@ def main():
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
             video_object.save_tracked_points_to_json(tracked_keypoints_folder)
 
+            video_object.release_video()
+
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
+
             print(f"Cropping and resizing video {video_id}...")
             video_object = video_manager.get_video_object(video_id)
 

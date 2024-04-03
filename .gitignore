@@ -1,4 +1,7 @@
 /data/
 /codes/output/
+codes/videos/
+codes/__pycache__/
 /tapnet/checkpoints/
 .idea/
+.ipynb_checkpoints/
