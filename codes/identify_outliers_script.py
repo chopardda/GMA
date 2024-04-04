@@ -98,11 +98,16 @@ for video_id in video_ids:
         y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
 
         outlier_set = set(x_outliers).union(set(y_outliers))
-        outliers[video_id][frame_index][keypoint] = [
-            (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
-             y_diffs[i] / y_std) for i in
-            outlier_set]
-        outlier_count += len(outlier_set)
+
+        if len(outlier_set) > 0:
+            outliers[video_id][frame_index][keypoint] = [
+                (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
+                 y_diffs[i] / y_std) for i in
+                outlier_set]
+            outlier_count += len(outlier_set)
+
+    if len(outliers[video_id][frame_index]) == 0:
+        outliers.pop(video_id)
 
 print(f"Found {outlier_count} outliers")
 
