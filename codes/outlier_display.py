@@ -3,9 +3,12 @@ import os
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import rc
+import pandas as pd
 
 
 class OutlierDisplay:
+    OUTLIER_DIR = './output/outliers'
+    FIGURES_DIR = './output/outliers/figures'
     def __init__(self, video_object, save_figures=False, stddev_threshold=3.0):
         self.video_object = video_object
         self.save_figures = save_figures
@@ -14,16 +17,34 @@ class OutlierDisplay:
         self.current_outlier_frame_index = None
         self.current_keypoint_name = None
         self.fig, self.ax_left_image, self.ax_right_image = None, None, None
-        self.confirmed_outliers = {}
+        self.new_confirmed_outliers = []
 
         # Ensure output directories exist
-        if not os.path.exists('./output/outliers'):
-            os.makedirs('./output/outliers', exist_ok=True)
 
-        if save_figures and not os.path.exists('./output/outliers/figures'):
-            os.makedirs('./output/outliers/figures', exist_ok=True)
+        if not os.path.exists(OutlierDisplay.OUTLIER_DIR):
+            os.makedirs(OutlierDisplay.OUTLIER_DIR, exist_ok=True)
+
+        if save_figures and not os.path.exists(OutlierDisplay.FIGURES_DIR):
+            os.makedirs(OutlierDisplay.FIGURES_DIR, exist_ok=True)
+
+        # Load/create outlier table
+        self.outlier_table_file = f'{OutlierDisplay.OUTLIER_DIR}/{self.video_object.video_id}_outliers.csv'
+
+        if os.path.exists(self.outlier_table_file):
+            self.confirmed_outliers_table = pd.read_csv(self.outlier_table_file)
+
+        else:
+            self.confirmed_outliers_table = pd.DataFrame(columns=['Frame index', 'Keypoint', 'Outlier frame index'])
+
 
     def show_outlier(self, keypoint_name, frame_index, outlier_frame_index, x_diff, x_stddev_mul, y_diff, y_stddev_mul):
+        # Check if outlier has already been confirmed
+        if self.confirmed_outliers_table[
+            (self.confirmed_outliers_table['Frame index'] == frame_index) &
+            (self.confirmed_outliers_table['Keypoint'] == keypoint_name) &
+            (self.confirmed_outliers_table['Outlier frame index'] == outlier_frame_index)].shape[0] > 0:
+            return
+
         self.frame_index = frame_index
         self.current_outlier_frame_index = outlier_frame_index
         self.current_keypoint_name = keypoint_name
@@ -58,30 +79,30 @@ class OutlierDisplay:
         plt.show()
 
     def write_outliers_to_file(self):
-        with open(f'./output/outliers/{self.video_object.video_id}_outliers.csv', 'w') as f:
-            f.write('Frame index, Keypoint, Outlier frame index\n')
-            for frame_index, keypoint_outliers in self.confirmed_outliers.items():
-                for keypoint, outlier_frame_indices in keypoint_outliers.items():
-                    for outlier_frame_index in outlier_frame_indices:
-                        f.write(f'{frame_index}, {keypoint}, {outlier_frame_index}\n')
+        # Append new confirmed outliers to outlier table and save it
+        self.confirmed_outliers_table = pd.concat(
+            [self.confirmed_outliers_table, pd.DataFrame(self.new_confirmed_outliers, columns=['Frame index', 'Keypoint', 'Outlier frame index'])],
+            ignore_index=True)
+
+        # Save outliers table to file
+        self.confirmed_outliers_table.to_csv(self.outlier_table_file, index=False)
 
     def _on_key(self, event):
         if event.key == 'escape':
             plt.close(self.fig)
 
         elif event.key == 'enter':
-            if self.frame_index not in self.confirmed_outliers:
-                self.confirmed_outliers[self.frame_index] = {}
+            if self.confirmed_outliers_table[
+                (self.confirmed_outliers_table['Frame index'] == self.frame_index) &
+                (self.confirmed_outliers_table['Keypoint'] == self.current_keypoint_name) &
+                (self.confirmed_outliers_table['Outlier frame index'] == self.current_outlier_frame_index)].shape[0] == 0:
+                # Add outlier to new outliers list
+                self.new_confirmed_outliers.append([self.frame_index, self.current_keypoint_name, self.current_outlier_frame_index])
 
-            if self.current_keypoint_name not in self.confirmed_outliers[self.frame_index]:
-                self.confirmed_outliers[self.frame_index][self.current_keypoint_name] = []
-
-            self.confirmed_outliers[self.frame_index][self.current_keypoint_name].append(
-                self.current_outlier_frame_index)
 
             if self.save_figures:
                 self.fig.suptitle("")
-                plt.savefig(f'./output/outliers/{self.video_object.video_id}_{self.frame_index}_{self.current_keypoint_name}_'
+                plt.savefig(f'{OutlierDisplay.FIGURES_DIR}/{self.video_object.video_id}_{self.frame_index}_{self.current_keypoint_name}_'
                             f'{self.current_outlier_frame_index}.png'.replace(' ', '_'))
 
             plt.close(self.fig)
