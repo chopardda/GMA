@@ -170,7 +170,7 @@ class VideoObject:
         Loads the video in the VideoObject if there is no video loaded yet.
         """
         if self.video is None:
-            print(f'Loading video {self.video_id}')
+            # print(f'Loading video {self.video_id}')
             self.video = media.read_video(self.file_path)
 
     def release_video(self):
@@ -178,7 +178,7 @@ class VideoObject:
         Release the video in the VideoObject if loaded.
         """
         if self.video is not None:
-            print(f'Releasing video {self.video_id}')
+            # print(f'Releasing video {self.video_id}')
             self.video = None
 
     def show_video(self):

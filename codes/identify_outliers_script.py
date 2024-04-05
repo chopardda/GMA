@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import numpy as np
+from tqdm import tqdm
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -112,6 +113,7 @@ for video_id in video_ids:
 print(f"Found {outlier_count} outliers")
 
 if args.show_outliers and len(outliers) > 0:
+    pbar = tqdm(total=outlier_count)
     for video_id in outliers:
         video_object = video_manager.get_video_object(video_id)
         video_object.load_video()
@@ -122,6 +124,7 @@ if args.show_outliers and len(outliers) > 0:
             for keypoint, outlier_frame_info in outliers[video_id][frame_index].items():
                 for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
                     od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
+                    pbar.update(1)
 
         od.write_outliers_to_file()
         video_object.release_video()
