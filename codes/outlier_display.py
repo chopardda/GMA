@@ -1,4 +1,5 @@
 import os
+from enum import Enum
 
 import matplotlib
 from matplotlib import pyplot as plt
@@ -9,6 +10,8 @@ import pandas as pd
 class OutlierDisplay:
     OUTLIER_DIR = './output/outliers'
     FIGURES_DIR = './output/outliers/figures'
+    outlier_type = Enum('outlier_type', 'INITIAL ALREADY RETURN')
+
     def __init__(self, video_object, save_figures=False, stddev_threshold=3.0):
         self.video_object = video_object
         self.save_figures = save_figures
@@ -34,8 +37,8 @@ class OutlierDisplay:
             self.confirmed_outliers_table = pd.read_csv(self.outlier_table_file)
 
         else:
-            self.confirmed_outliers_table = pd.DataFrame(columns=['Frame index', 'Keypoint', 'Outlier frame index'])
-
+            self.confirmed_outliers_table = pd.DataFrame(
+                columns=['Frame index', 'Keypoint', 'Outlier frame index', 'Outlier Type'])
 
     def show_outlier(self, keypoint_name, frame_index, outlier_frame_index, x_diff, x_stddev_mul, y_diff, y_stddev_mul):
         # Check if outlier has already been confirmed
@@ -72,7 +75,8 @@ class OutlierDisplay:
         self.fig.suptitle(f'Potential outlier for keypoint {keypoint_name} at frame {outlier_frame_index}\n'
                           f'X diff: {x_diff}, X stddev mul: {x_stddev_mul}\n'
                           f'Y diff: {y_diff}, Y stddev mul: {y_stddev_mul}\n\n'
-                          f'Press Enter to confirm as an outlier, Escape to close the window.')
+                          f'Press Enter to confirm as an outlier, 1 to indicate as initial outlier, 2 to indicate as '
+                          f'already an outlier and 3 to indicate as returning to place')
 
         self._move_figure(200, 200)
         cid_key = self.fig.canvas.mpl_connect('key_press_event', self._on_key)
@@ -81,7 +85,9 @@ class OutlierDisplay:
     def write_outliers_to_file(self):
         # Append new confirmed outliers to outlier table and save it
         self.confirmed_outliers_table = pd.concat(
-            [self.confirmed_outliers_table, pd.DataFrame(self.new_confirmed_outliers, columns=['Frame index', 'Keypoint', 'Outlier frame index'])],
+            [self.confirmed_outliers_table,
+             pd.DataFrame(self.new_confirmed_outliers,
+                          columns=['Frame index', 'Keypoint', 'Outlier frame index', 'Outlier Type'])],
             ignore_index=True)
 
         # Save outliers table to file
@@ -91,19 +97,29 @@ class OutlierDisplay:
         if event.key == 'escape':
             plt.close(self.fig)
 
-        elif event.key == 'enter':
+        elif event.key in ['1', '2', '3']:
             if self.confirmed_outliers_table[
                 (self.confirmed_outliers_table['Frame index'] == self.frame_index) &
                 (self.confirmed_outliers_table['Keypoint'] == self.current_keypoint_name) &
-                (self.confirmed_outliers_table['Outlier frame index'] == self.current_outlier_frame_index)].shape[0] == 0:
-                # Add outlier to new outliers list
-                self.new_confirmed_outliers.append([self.frame_index, self.current_keypoint_name, self.current_outlier_frame_index])
+                (self.confirmed_outliers_table['Outlier frame index'] == self.current_outlier_frame_index)].shape[
+                0] == 0:
+                # Determine type
+                if event.key == '1':
+                    outlier_type = OutlierDisplay.outlier_type.INITIAL.value
+                elif event.key == '2':
+                    outlier_type = OutlierDisplay.outlier_type.ALREADY.value
+                else:
+                    outlier_type = OutlierDisplay.outlier_type.RETURN.value
 
+                # Add outlier to new outliers list
+                self.new_confirmed_outliers.append(
+                    [self.frame_index, self.current_keypoint_name, self.current_outlier_frame_index, outlier_type])
 
             if self.save_figures:
                 self.fig.suptitle("")
-                plt.savefig(f'{OutlierDisplay.FIGURES_DIR}/{self.video_object.video_id}_{self.frame_index}_{self.current_keypoint_name}_'
-                            f'{self.current_outlier_frame_index}.png'.replace(' ', '_'))
+                plt.savefig(
+                    f'{OutlierDisplay.FIGURES_DIR}/{self.video_object.video_id}_{self.frame_index}_{self.current_keypoint_name}_'
+                    f'{self.current_outlier_frame_index}.png'.replace(' ', '_'))
 
             plt.close(self.fig)
 
