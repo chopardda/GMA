@@ -116,7 +116,6 @@ if args.show_outliers and len(outliers) > 0:
     pbar = tqdm(total=outlier_count)
     for video_id in outliers:
         video_object = video_manager.get_video_object(video_id)
-        video_object.load_video()
 
         od = OutlierDisplay(video_object, save_figures=args.save_figures, stddev_threshold=args.stddev_threshold)
 

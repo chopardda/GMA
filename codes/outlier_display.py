@@ -48,6 +48,10 @@ class OutlierDisplay:
             (self.confirmed_outliers_table['Outlier frame index'] == outlier_frame_index)].shape[0] > 0:
             return
 
+        # Load video if it is not already loaded
+        if self.video_object.video is None:
+            self.video_object.load_video()
+
         self.frame_index = frame_index
         self.current_outlier_frame_index = outlier_frame_index
         self.current_keypoint_name = keypoint_name
