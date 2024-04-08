@@ -10,7 +10,7 @@ import pandas as pd
 class OutlierDisplay:
     OUTLIER_DIR = './output/outliers'
     FIGURES_DIR = './output/outliers/figures'
-    outlier_type = Enum('outlier_type', 'INITIAL ALREADY RETURN')
+    outlier_type = Enum('outlier_type', 'NOT_OUTLIER INITIAL ALREADY RETURN', start=0)
 
     def __init__(self, video_object, save_figures=False, stddev_threshold=3.0):
         self.video_object = video_object
@@ -98,17 +98,16 @@ class OutlierDisplay:
         self.confirmed_outliers_table.to_csv(self.outlier_table_file, index=False)
 
     def _on_key(self, event):
-        if event.key == 'escape':
-            plt.close(self.fig)
-
-        elif event.key in ['1', '2', '3']:
+        if event.key in ['escape', '1', '2', '3']:
             if self.confirmed_outliers_table[
                 (self.confirmed_outliers_table['Frame index'] == self.frame_index) &
                 (self.confirmed_outliers_table['Keypoint'] == self.current_keypoint_name) &
                 (self.confirmed_outliers_table['Outlier frame index'] == self.current_outlier_frame_index)].shape[
                 0] == 0:
                 # Determine type
-                if event.key == '1':
+                if event.key == 'escape':
+                    outlier_type = OutlierDisplay.outlier_type.NOT_OUTLIER.value
+                elif event.key == '1':
                     outlier_type = OutlierDisplay.outlier_type.INITIAL.value
                 elif event.key == '2':
                     outlier_type = OutlierDisplay.outlier_type.ALREADY.value
