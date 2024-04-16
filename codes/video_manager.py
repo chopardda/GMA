@@ -8,6 +8,7 @@ import glob
 
 from collections import defaultdict
 from PIL import Image
+import pandas as pd
 from point_labeler import PointLabeler
 from point_merger import PointMerger
 
@@ -146,6 +147,11 @@ class VideoManager:
                     # Remove video from collection
                     self.video_collection.pop(video_id)
 
+    def load_all_outlier_data(self, outlier_data_folder):
+        video_keys = list(self.video_collection.keys())
+        for video_id in video_keys:
+            self.video_collection[video_id].load_outlier_data_from_folder(outlier_data_folder)
+
 #################################################
 ############# VideoObject Class ################
 #################################################
@@ -164,6 +170,8 @@ class VideoObject:
         self.extreme_coordinates = {}  # Format: {leftmost: , topmost: , rightmost: , bottommost: }
 
         self.labeling_task = None
+
+        self.outlier_data = None
 
     def load_video(self):
         """
@@ -297,6 +305,14 @@ class VideoObject:
         filename = os.path.join(output_dir, self._get_filename('json', tag))
         with open(filename, 'w') as f:
             json.dump(keypoints_dict, f, indent=4)
+
+    def load_outlier_data_from_folder(self, outlier_data_folder):
+        file_path = os.path.join(outlier_data_folder, f'{self.video_id}_outliers.csv')
+
+        # If this file does not exist, that only means there is no outlier data for this video
+        if os.path.exists(file_path):
+            self.outlier_data = pd.read_csv(file_path)
+
 
     def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
         file_types = ['csv', 'json']
@@ -641,6 +657,19 @@ class VideoObject:
                 frame_deltas[keypoint].append((x_diff, y_diff))
 
         return frame_deltas
+
+    def get_sorted_outlier_table(self):
+        return self.outlier_data.sort_values(by=['Frame index', 'Keypoint', 'Outlier frame index'])
+
+    def get_point_set_for_outlier(self, frame_index, keypoint, outlier_frame_index):
+        # Load all points at the provided outlier frame index
+        point_set = {}
+
+        for kp, tracked_list in self.tracking_data[frame_index].items():
+            point_set[kp] = tracked_list[outlier_frame_index]
+
+        return point_set
+
 
 
 #################################################
