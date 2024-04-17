@@ -1,4 +1,6 @@
 /data/
-/codes/output/
+/codes/output/labeled
+/codes/output/labelled_points
+/codes/output/tracked_points
 /tapnet/checkpoints/
 .idea/
