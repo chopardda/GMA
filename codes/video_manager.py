@@ -659,14 +659,14 @@ class VideoObject:
         return frame_deltas
 
     def get_sorted_outlier_table(self):
-        return self.outlier_data.sort_values(by=['Frame index', 'Keypoint', 'Outlier frame index'])
+        return self.outlier_data.sort_values(by=['Frame index', 'Outlier frame index', 'Keypoint'])
 
     def get_point_set_for_outlier(self, frame_index, keypoint, outlier_frame_index):
         # Load all points at the provided outlier frame index
         point_set = {}
 
         for kp, tracked_list in self.tracking_data[frame_index].items():
-            point_set[kp] = tracked_list[outlier_frame_index]
+            point_set[kp] = np.array([tracked_list[outlier_frame_index]['x'], tracked_list[outlier_frame_index]['y']])
 
         return point_set
 
