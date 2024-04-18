@@ -43,12 +43,12 @@ class PointLabeler:
         # self.keypoint_positions = {}  # { frame_number: { keypoint: (x, y), ...}, ... }
 
     def setup_figure(self, frame):
-        fig = plt.figure(figsize=(20, 10))
+        fig = plt.figure(figsize=(30,10))
         ax_image = fig.add_subplot(121)
         ax_list = fig.add_subplot(122)
         ax_image.imshow(frame)  # self.video_data.video[self.select_frame])
         ax_image.axis('off')
-        fig.suptitle('Click to select points. \n Spacebar to skip points. \n Afterwards, press enter to close '
+        fig.suptitle('Click to select some points. \n Spacebar to skip points. \n Afterwards, press enter to close '
                            'the figure.')
         ax_list.axis('off')
         self.update_list(ax_list)
@@ -62,7 +62,7 @@ class PointLabeler:
             color = self.colormap[keypoint]
             if keypoint in self.selected_points:
                 text += str(self.selected_points[keypoint])
-            ax_list.text(0, 1 - (i * 0.1), text, va='top', ha='left', fontsize=12, color=color)
+            ax_list.text(0, 1 - (i * 0.06), text, va='top', ha='left', fontsize=12, color=color)
         ax_list.figure.canvas.draw()
 
     def redraw_points(self):
