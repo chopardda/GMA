@@ -88,7 +88,7 @@ class VideoManager:
         # Stores videos
         self.video_collection = {}  # Format: { video_id: VideoObject, ... }
 
-    def add_video(self, filepath, load_now=False, add_pt_data=False):
+    def add_video(self, filepath, video_size, load_now=False, add_pt_data=False):
         filename = os.path.basename(filepath)
         video_id = os.path.splitext(filename)[0]
 
@@ -103,15 +103,19 @@ class VideoManager:
         else:
             patient_data = None
 
-        self.video_collection[video_id] = VideoObject(filepath, video_id, video, patient_data)
+        self.video_collection[video_id] = VideoObject(filepath, video_id, video_size, video, patient_data)
 
     def add_all_videos(self, folder, load_now=False, add_pt_data=False):
         for root, dirs, files in os.walk(folder):
             for file in files:
                 if file.lower().endswith('.mp4'):
-                    self.add_video(os.path.join(root, file), load_now, add_pt_data)
+                    full_filename = os.path.join(root, file)
+                    self.add_video(full_filename, os.path.getsize(full_filename), load_now, add_pt_data)
 
-    def get_all_video_ids(self):
+    def get_all_video_ids(self, sort=True):
+        if sort:
+            return sorted(list(self.video_collection.keys()), key=lambda x: int(self.video_collection[x].video_size))
+
         return list(self.video_collection.keys())
 
     def get_video_object(self, video_id):
@@ -128,16 +132,30 @@ class VideoManager:
         if video_id in self.video_collection:
             del self.video_collection[video_id].video
 
+    def load_all_tracked_points(self, tracked_keypoints_folder, file_type='json', missing_ok=False):
+        video_keys = list(self.video_collection.keys())
+        for video_id in video_keys:
+            try:
+                self.video_collection[video_id].load_tracked_points_from_folder(tracked_keypoints_folder, file_type)
+
+            except FileNotFoundError as e:
+                if not missing_ok:
+                    raise FileNotFoundError(f"Error loading tracked points for video {video_id}: {e}")
+
+                else:
+                    # Remove video from collection
+                    self.video_collection.pop(video_id)
 
 #################################################
 ############# VideoObject Class ################
 #################################################
 
 class VideoObject:
-    def __init__(self, file_path, video_id, video=None, patient_data=None):
+    def __init__(self, file_path, video_id, video_size, video=None, patient_data=None):
         self.file_path = file_path
         self.video_id = video_id
         self.video = video  # a VideoArray object
+        self.video_size = video_size
 
         self.patient_data = patient_data
 
@@ -152,7 +170,7 @@ class VideoObject:
         Loads the video in the VideoObject if there is no video loaded yet.
         """
         if self.video is None:
-            print(f'Loading video {self.video_id}')
+            # print(f'Loading video {self.video_id}')
             self.video = media.read_video(self.file_path)
 
     def release_video(self):
@@ -160,7 +178,7 @@ class VideoObject:
         Release the video in the VideoObject if loaded.
         """
         if self.video is not None:
-            print(f'Releasing video {self.video_id}')
+            # print(f'Releasing video {self.video_id}')
             self.video = None
 
     def show_video(self):
@@ -610,6 +628,19 @@ class VideoObject:
         # Release video from memory after processing it
         if load_and_release_video:
             self.release_video()
+
+    def get_tracked_points_deltas(self, frame_index):
+        # Return the difference between successive frames for each tracked point based on the frame_index
+        assert frame_index in self.tracking_data, f"No tracked points found for frame {frame_index}"
+
+        frame_deltas = { keypoint: [] for keypoint in self.tracking_data[frame_index] }
+        for keypoint, data_list in self.tracking_data[frame_index].items():
+            for i, data in enumerate(data_list[:-1]):
+                x_diff = abs(data['x'] - data_list[i+1]['x'])
+                y_diff = abs(data['y'] - data_list[i+1]['y'])
+                frame_deltas[keypoint].append((x_diff, y_diff))
+
+        return frame_deltas
 
 
 #################################################

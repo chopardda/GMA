@@ -32,6 +32,8 @@ def main():
                         help='Path to output directory to save cropped videos.')
     parser.add_argument('--resized_videos_path', default='./output/resized',
                         help='Path to output directory to save cropped and resized videos.')
+    parser.add_argument('--frame_limit', default='auto',
+                        help='Limit the number of frames to process on GPU per batch (default: auto)')
 
     args = parser.parse_args()
 
@@ -55,7 +57,7 @@ def main():
     video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 
     # Create point tracker
-    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy')
+    tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', args.frame_limit)
 
     video_ids = video_manager.get_all_video_ids()
     # video_ids = ['18_FN_c', '07_F-_c']
@@ -91,6 +93,8 @@ def main():
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
             video_object.save_tracked_points_to_json(tracked_keypoints_folder)
 
+            video_object.release_video()
+
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
@@ -110,8 +114,6 @@ def main():
             # -- Crop video and save to cropped_videos folder
             video_object.crop_and_resize_video(cropped_videos_folder, resize=True, resize_folder=resized_videos_folder,
                                                load_and_release_video=True)
-
-
 
     # # Now, iterate over the videos in the manager and process each one
     # for video_id in video_manager.video_collection:

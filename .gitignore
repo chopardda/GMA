@@ -2,5 +2,10 @@
 /codes/output/labeled
 /codes/output/labelled_points
 /codes/output/tracked_points
+/codes/videos/
+codes/output/merged_archive/
+codes/videos/
+codes/__pycache__/
 /tapnet/checkpoints/
 .idea/
+.ipynb_checkpoints/
