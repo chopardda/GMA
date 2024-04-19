@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+from tqdm import tqdm
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -35,10 +36,11 @@ video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.miss
 video_manager.load_all_outlier_data(args.outlier_dir)
 video_ids = video_manager.get_all_video_ids()
 
-for video_id in video_ids:
+for video_id in tqdm(video_ids):
     video_object = video_manager.get_video_object(video_id)
 
-    if video_object.outlier_data is not None:
+    if video_object.outlier_data is not None and not video_object.keypoints_file_exists(args.output_path, args.task,
+                                                                                        file_type='csv'):
         # Present user with the option to redefine the outlier points from the beginning to end of the video
         # For the rest of the points in that frame, provide the currently tracked points (these may optionally be
         # relabeled)

@@ -5,7 +5,7 @@ from point_labeler import PointLabeler
 
 
 class PointRelabeler(PointLabeler):
-    TITLE_BASE = ('Use the number keys to choose a point to redefine, and the click to choose the new location. \n '
+    TITLE_BASE = ('Use the number keys or click on a point to redefine, and then click to choose the new location. \n '
                   'Afterwards, press enter to close the figure.')
 
     def __init__(self):
@@ -45,6 +45,20 @@ class PointRelabeler(PointLabeler):
                 self.current_point = None
                 self.old_color = None
                 self.redraw_points()
+        else:
+            # Find the closest point to click event
+            x, y = event.xdata, event.ydata
+            min_dist = float('inf')
+            for keypoint, point in self.selected_points.items():
+                dist = np.linalg.norm(np.array([x, y]) - point)
+                if dist < min_dist:
+                    self.current_point = keypoint
+                    min_dist = dist
+
+            self.old_color = self.colormap[self.current_point]
+            self.colormap[self.current_point] = 'red'
+            self.redraw_points()
+
 
     def on_key(self, event):
         if self.current_point is None:
