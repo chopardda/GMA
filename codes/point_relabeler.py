@@ -77,12 +77,12 @@ class PointRelabeler(PointLabeler):
             self.old_color = None
             self.redraw_points()
 
-    def relabel_points(self, frame, frame_index, current_points, keypoint, task='extreme_keypoints'):
+    def relabel_points(self, frame, outlier_frame_index, current_points, keypoint, task='extreme_keypoints'):
         self.frame = frame
-        self.select_frame = frame_index
+        self.select_frame = outlier_frame_index
 
         # Update title
-        self.title_text = PointRelabeler.TITLE_BASE + f'\n Detected outlier: {keypoint}, frame: {frame_index} at x: {current_points[keypoint][0]}, y: {current_points[keypoint][1]}'
+        self.title_text = PointRelabeler.TITLE_BASE + f'\n Detected outlier: {keypoint}, frame: {outlier_frame_index} at x: {current_points[keypoint][0]}, y: {current_points[keypoint][1]}'
 
         # Copy current_points into selected_points
         self.selected_points = current_points.copy()

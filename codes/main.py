@@ -71,7 +71,6 @@ def main():
             video_object = video_manager.get_video_object(video_id)
 
             # Define starting frame and tracking task (which keypoints to track)
-            frame_index = 0
             task = 'extreme_keypoints'
 
             # Load video
@@ -81,7 +80,6 @@ def main():
             try:
                 video_object.track_points(
                     tracker,
-                    frame_index,
                     task,
                     labeled_keypoints_folder,
                     'json'

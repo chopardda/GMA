@@ -35,11 +35,10 @@ video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.miss
 video_ids = video_manager.get_all_video_ids()
 
 print("Gathering video statistics...")
-frame_index = 0  # Use this later when we have more index frames
 keypoint_frame_deltas = {}
 
 for video_id in video_ids:
-    video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas(frame_index)
+    video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas()
 
     for keypoint, deltas in video_frame_deltas.items():
         if keypoint not in keypoint_frame_deltas:
@@ -80,9 +79,8 @@ outlier_count = 0
 
 for video_id in video_ids:
     video_object = video_manager.get_video_object(video_id)
-    video_frame_deltas = video_object.get_tracked_points_deltas(frame_index)
+    video_frame_deltas = video_object.get_tracked_points_deltas()
     outliers[video_id] = {}
-    outliers[video_id][frame_index] = {}
 
     for keypoint, deltas in video_frame_deltas.items():
         x_deltas = [delta[0] for delta in deltas]
@@ -101,13 +99,13 @@ for video_id in video_ids:
         outlier_set = set(x_outliers).union(set(y_outliers))
 
         if len(outlier_set) > 0:
-            outliers[video_id][frame_index][keypoint] = [
+            outliers[video_id][keypoint] = [
                 (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
                  y_diffs[i] / y_std) for i in
                 outlier_set]
             outlier_count += len(outlier_set)
 
-    if len(outliers[video_id][frame_index]) == 0:
+    if len(outliers[video_id]) == 0:
         outliers.pop(video_id)
 
 print(f"Found {outlier_count} outliers")
@@ -119,11 +117,10 @@ if args.show_outliers and len(outliers) > 0:
 
         od = OutlierDisplay(video_object, save_figures=args.save_figures, stddev_threshold=args.stddev_threshold)
 
-        for frame_index in outliers[video_id]:
-            for keypoint, outlier_frame_info in outliers[video_id][frame_index].items():
-                for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
-                    od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
-                    pbar.update(1)
+        for keypoint, outlier_frame_info in outliers[video_id].items():
+            for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
+                od.show_outlier(keypoint, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
+                pbar.update(1)
 
         od.write_outliers_to_file()
         video_object.release_video()
