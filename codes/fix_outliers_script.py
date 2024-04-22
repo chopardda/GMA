@@ -47,15 +47,19 @@ for video_id in tqdm(video_ids):
         outliers = video_object.get_sorted_outlier_table()
         relabeler = PointRelabeler()
         video_object.load_video()
+        video_object.load_keypoint_labels_from_folder(args.labeled_kp_path, file_type='csv')
+
+        # Store a list of already labelled frames, they don't need to be labeled more than once
+        labelled_frames = []
 
         for idx, outlier in outliers.iterrows():
-            if outlier['Outlier Type'] == 0:
+            outlier_frame_index = outlier['Outlier frame index'] + 1
+
+            if outlier['Outlier Type'] == 0 or outlier['Outlier frame index'] + 1 in labelled_frames:
                 continue
 
-            outlier_frame_index = outlier['Outlier frame index'] + 1
-            video_object.load_keypoint_labels_from_folder(args.labeled_kp_path, file_type='csv')
-            point_set = video_object.get_point_set_for_outlier(outlier['Frame index'], outlier['Keypoint'],
-                                                               outlier_frame_index)
+            labelled_frames.append(outlier_frame_index)
+            point_set = video_object.get_point_set_for_outlier(outlier_frame_index)
             relabeler.relabel_points(video_object.video[outlier_frame_index], outlier_frame_index,
                                      point_set, outlier['Keypoint'], args.task)
 

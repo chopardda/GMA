@@ -16,7 +16,6 @@ class OutlierDisplay:
         self.video_object = video_object
         self.save_figures = save_figures
         self.stddev_threshold = stddev_threshold
-        self.frame_index = None
         self.current_outlier_frame_index = None
         self.current_keypoint_name = None
         self.fig, self.ax_left_image, self.ax_right_image = None, None, None
@@ -38,12 +37,11 @@ class OutlierDisplay:
 
         else:
             self.confirmed_outliers_table = pd.DataFrame(
-                columns=['Frame index', 'Keypoint', 'Outlier frame index', 'Outlier Type'])
+                columns=['Keypoint', 'Outlier frame index', 'Outlier Type'])
 
-    def show_outlier(self, keypoint_name, frame_index, outlier_frame_index, x_diff, x_stddev_mul, y_diff, y_stddev_mul):
+    def show_outlier(self, keypoint_name, outlier_frame_index, x_diff, x_stddev_mul, y_diff, y_stddev_mul):
         # Check if outlier has already been confirmed
         if self.confirmed_outliers_table[
-            (self.confirmed_outliers_table['Frame index'] == frame_index) &
             (self.confirmed_outliers_table['Keypoint'] == keypoint_name) &
             (self.confirmed_outliers_table['Outlier frame index'] == outlier_frame_index)].shape[0] > 0:
             return
@@ -52,7 +50,6 @@ class OutlierDisplay:
         if self.video_object.video is None:
             self.video_object.load_video()
 
-        self.frame_index = frame_index
         self.current_outlier_frame_index = outlier_frame_index
         self.current_keypoint_name = keypoint_name
         self.fig = plt.figure(figsize=(20, 10))
@@ -64,11 +61,11 @@ class OutlierDisplay:
         self.ax_right_image.axis('off')
 
         # Plot points
-        left_point = self.video_object.tracking_data[0][keypoint_name][outlier_frame_index]['x'], \
-            self.video_object.tracking_data[0][keypoint_name][outlier_frame_index]['y']
+        left_point = self.video_object.arranged_tracking_data[keypoint_name][outlier_frame_index]['x'], \
+            self.video_object.arranged_tracking_data[keypoint_name][outlier_frame_index]['y']
 
-        right_point = self.video_object.tracking_data[0][keypoint_name][outlier_frame_index + 1]['x'], \
-            self.video_object.tracking_data[0][keypoint_name][outlier_frame_index + 1]['y']
+        right_point = self.video_object.arranged_tracking_data[keypoint_name][outlier_frame_index + 1]['x'], \
+            self.video_object.arranged_tracking_data[keypoint_name][outlier_frame_index + 1]['y']
         self.ax_left_image.plot(left_point[0], left_point[1], 'o', color='red')
         self.ax_right_image.plot(right_point[0], right_point[1], 'o', color='red')
 
@@ -91,7 +88,7 @@ class OutlierDisplay:
         self.confirmed_outliers_table = pd.concat(
             [self.confirmed_outliers_table,
              pd.DataFrame(self.new_confirmed_outliers,
-                          columns=['Frame index', 'Keypoint', 'Outlier frame index', 'Outlier Type'])],
+                          columns=['Keypoint', 'Outlier frame index', 'Outlier Type'])],
             ignore_index=True)
 
         # Save outliers table to file
@@ -100,7 +97,6 @@ class OutlierDisplay:
     def _on_key(self, event):
         if event.key in ['escape', '1', '2', '3']:
             if self.confirmed_outliers_table[
-                (self.confirmed_outliers_table['Frame index'] == self.frame_index) &
                 (self.confirmed_outliers_table['Keypoint'] == self.current_keypoint_name) &
                 (self.confirmed_outliers_table['Outlier frame index'] == self.current_outlier_frame_index)].shape[
                 0] == 0:
@@ -116,12 +112,12 @@ class OutlierDisplay:
 
                 # Add outlier to new outliers list
                 self.new_confirmed_outliers.append(
-                    [self.frame_index, self.current_keypoint_name, self.current_outlier_frame_index, outlier_type])
+                    [self.current_keypoint_name, self.current_outlier_frame_index, outlier_type])
 
             if self.save_figures:
                 self.fig.suptitle("")
                 plt.savefig(
-                    f'{OutlierDisplay.FIGURES_DIR}/{self.video_object.video_id}_{self.frame_index}_{self.current_keypoint_name}_'
+                    f'{OutlierDisplay.FIGURES_DIR}/{self.video_object.video_id}_{self.current_keypoint_name}_'
                     f'{self.current_outlier_frame_index}.png'.replace(' ', '_'))
 
             plt.close(self.fig)
