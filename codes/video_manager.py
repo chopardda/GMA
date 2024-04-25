@@ -618,6 +618,9 @@ class VideoObject:
         elif file_type == 'csv':
             self._load_tracked_points_from_csv(file_path)
 
+        self.update_arranged_tracked_data()
+
+    def update_arranged_tracked_data(self):
         self.arranged_tracking_data = self.get_arranged_tracking_data()
 
     def _load_tracked_points_from_csv(self, csv_file_path):
@@ -793,8 +796,31 @@ class VideoObject:
 
         return arranged_tracking_data
 
+    def impute_value(self, keypoint, frame_index):
+        assert frame_index != 0 and frame_index != len(self.video) - 1, "Cannot impute value for first or last frame"
+        x_0, y_0 = self.arranged_tracking_data[keypoint][frame_index - 1]['x'], self.arranged_tracking_data[keypoint][frame_index - 1]['y']
+        x_2, y_2 = self.arranged_tracking_data[keypoint][frame_index + 1]['x'], self.arranged_tracking_data[keypoint][frame_index + 1]['y']
+        return np.mean([x_0, x_2]), np.mean([y_0, y_2])
+
+    def get_tracking_data_position(self, frame_index):
+        keyframes = sorted(list(self.tracking_data.keys()))
+        keyframes.append(len(self.video))
+
+        for i in range(len(keyframes) - 1):
+            if keyframes[i] <= frame_index < keyframes[i + 1]:
+                return keyframes[i], frame_index - keyframes[i]
+
+
     def get_sorted_outlier_table(self):
         return self.outlier_data.sort_values(by=['Keypoint', 'Outlier frame index'])
+
+    def get_one_off_outliers(self, diff=1):
+        outlier_table = self.get_sorted_outlier_table()
+        outlier_table['diff'] = outlier_table['Outlier frame index'].diff(-1) * -1
+        outlier_table['next_type'] = outlier_table['Outlier Type'].shift(-1)
+        outlier_table['next_keypoint'] = outlier_table['Keypoint'].shift(-1)
+        one_offs = outlier_table[(outlier_table['diff'] == diff) & (outlier_table['Outlier Type'] == 1) & (outlier_table['next_type'] == 3) & (outlier_table['Keypoint'] == outlier_table['next_keypoint'])]
+        return one_offs
 
     def get_point_set_for_outlier(self, outlier_frame_index):
         # Load all points at the provided outlier frame index

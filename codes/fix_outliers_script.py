@@ -32,7 +32,7 @@ if not os.path.exists(output_folder):
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
-video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
+video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok, file_type='csv')
 video_manager.load_all_outlier_data(args.outlier_dir)
 video_ids = video_manager.get_all_video_ids()
 
@@ -49,13 +49,27 @@ for video_id in tqdm(video_ids):
         video_object.load_video()
         video_object.load_keypoint_labels_from_folder(args.labeled_kp_path, file_type='csv')
 
+        # Handle the case where the outlier immediately returns to the correct place in the following frame
+        one_offs = video_object.get_one_off_outliers()
+        for idx, outlier in one_offs.iterrows():
+            outlier_frame_index = outlier['Outlier frame index'] + 1
+            outlier_keypoint = outlier['Keypoint']
+            imp_x, imp_y = video_object.impute_value(outlier_keypoint, outlier_frame_index)
+            adj_idx, adj_frame_idx = video_object.get_tracking_data_position(outlier_frame_index)
+            video_object.tracking_data[adj_idx][outlier_keypoint][adj_frame_idx]['x'] = imp_x
+            video_object.tracking_data[adj_idx][outlier_keypoint][adj_frame_idx]['y'] = imp_y
+            video_object.update_arranged_tracked_data()
+
+        # Remove oneoffs from outlier list
+        outliers = outliers.drop(one_offs.index)
+
         # Store a list of already labelled frames, they don't need to be labeled more than once
         labelled_frames = []
 
         for idx, outlier in outliers.iterrows():
             outlier_frame_index = outlier['Outlier frame index'] + 1
 
-            if outlier['Outlier Type'] == 0 or outlier['Outlier frame index'] + 1 in labelled_frames:
+            if outlier['Outlier Type'] in [0, 3] or outlier['Outlier frame index'] + 1 in labelled_frames:
                 continue
 
             labelled_frames.append(outlier_frame_index)
@@ -68,5 +82,9 @@ for video_id in tqdm(video_ids):
         # -- Save labelled points to file
         video_object.save_keypoints_to_csv(output_folder)
         video_object.save_keypoints_to_json(output_folder)
+
+        # Save updated tracking data
+        video_object.save_tracked_points_to_csv(args.tracked_kp_path)
+        video_object.save_tracked_points_to_json(args.tracked_kp_path)
 
         video_object.release_video()
