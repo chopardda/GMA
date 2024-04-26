@@ -187,14 +187,14 @@ class PointTracker:
         tracks, visibles = self.inference(frames, query_points)
         return tracks, visibles
 
-    def track_selected_points(self, video, select_frame, select_points, track_backward=False):
+    def track_selected_points(self, video, start_frame_index, end_frame_index, select_points, track_backward=False):
         height, width = video.metadata.shape
         frames = media.resize_video(video, (self.resize_height, self.resize_width)) # shape (n_frames, h, w, 3)
 
         if track_backward:
-            frames = frames[:select_frame + 1][::-1]  # Reverse the frames up to the selected frame
+            frames = frames[start_frame_index:end_frame_index+1][::-1]
         else:
-            frames = frames[select_frame:]  # Start from the selected frame to the end
+            frames = frames[start_frame_index:end_frame_index]
 
         if self.frame_limit is not None:
             curr_frame = 0
@@ -240,7 +240,7 @@ class PointTracker:
 
         else:
             # Convert from (x,y) to (t,y,x), where t = select_frame
-            query_points = convert_select_point_dict_to_query_points(select_frame, select_points)
+            query_points = convert_select_point_dict_to_query_points(start_frame_index, select_points)
 
             # From original image size to resized dimensions
             query_points = transforms.convert_grid_coordinates(
