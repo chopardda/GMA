@@ -347,9 +347,10 @@ class VideoObject:
         video_frame = self.video[frame_index]
 
         point_labeler = PointLabeler()
-        point_labeler.label_points(video_frame, frame_index, task=task)
+        # point_labeler.label_points(video_frame, frame_index, task=task)
+        point_labeler.label_points_adaptive(self, task)
 
-        self.add_keypoint_labels(frame_index, point_labeler.selected_points)
+        self.add_keypoint_labels(point_labeler.select_frame, point_labeler.selected_points)
         self.labeling_task = task
 
     def _get_filename(self, format, tag=None):
