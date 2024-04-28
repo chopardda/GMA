@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES = 0  # TODO: use GPU
+# CUDA_VISIBLE_DEVICES = 0
 
 import os
 import sys
@@ -12,8 +12,6 @@ sys.path.append(parent_directory)
 from point_tracker import PointTracker
 from video_manager import VideoManager
 
-
-# TODO: all paths or as arguments!
 
 def main():
     parser = argparse.ArgumentParser(description='Process videos.')
@@ -59,8 +57,8 @@ def main():
     # Create point tracker
     tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', args.frame_limit)
 
-    video_ids = video_manager.get_all_video_ids()
-    # video_ids = ['18_FN_c', '07_F-_c']
+    # video_ids = video_manager.get_all_video_ids()
+    video_ids = ['cropped_vid_07_PR_c', 'cropped_vid_01_PR_c']
 
     # --- Track extreme coordinates for cropping
     if not args.crop_resize_only:
@@ -71,7 +69,7 @@ def main():
             video_object = video_manager.get_video_object(video_id)
 
             # Define starting frame and tracking task (which keypoints to track)
-            task = 'extreme_keypoints'
+            task = 'all_body_keypoints'
 
             # Load video
             video_object.load_video()

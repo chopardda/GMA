@@ -91,13 +91,17 @@ class PointMerger(PointLabeler):
         labeled_points = []
         current_keypoint = self.body_keypoints[len(self.selected_points)]
         for k, v in self.selected_point_sets.items():
-            point = v[self.select_frame][current_keypoint]
+            if current_keypoint in v[self.select_frame].keys():
+                point = v[self.select_frame][current_keypoint]
+            else:
+                point = None
             if point is not None:
                 labeled_points.append(point)
 
         # Ensure there are visible/labeled points before calculating the average
         if not labeled_points:
-            raise ValueError("No labeled points found for the current keypoint.")
+            return None, None
+            # raise ValueError("No labeled points found for the current keypoint.")
 
         # Calculate the average point
         average_point = [sum([p['x'] for p in labeled_points]) / len(labeled_points),
@@ -108,7 +112,10 @@ class PointMerger(PointLabeler):
     def _merge_all_points(self):
         for keypoint in self.body_keypoints:
             _, average_point = self._get_current_labeled_and_average_points()
-            self.selected_points[keypoint] = np.array(average_point)
+            if average_point is not None:
+                self.selected_points[keypoint] = np.array(average_point)
+            else:
+                self.selected_points[keypoint] = None
 
     def merge_points(self, frame, frame_index, point_sets, task='extreme_keypoints', auto_accept_single=False):
         self.selected_point_sets = point_sets
