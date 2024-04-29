@@ -106,8 +106,8 @@ class PointTracker:
         if type(frame_limit) == str and frame_limit.lower() == 'auto':
             self.frame_limit = self._determine_GPU_limit(9)
 
-        elif type(frame_limit) == int:
-            self.frame_limit = frame_limit
+        elif int(frame_limit) > 0:
+            self.frame_limit = int(frame_limit)
 
         else:
             self.frame_limit = None
@@ -192,7 +192,8 @@ class PointTracker:
         frames = media.resize_video(video, (self.resize_height, self.resize_width)) # shape (n_frames, h, w, 3)
 
         if track_backward:
-            frames = frames[start_frame_index:end_frame_index+1][::-1]
+            # frames = frames[start_frame_index:end_frame_index + 1][::-1]
+            frames = np.flip(frames[start_frame_index:end_frame_index + 1], 0)
         else:
             frames = frames[start_frame_index:end_frame_index]
 
@@ -237,6 +238,15 @@ class PointTracker:
                 else:
                     curr_frame += self.frame_limit
 
+            if track_backward:
+                # Remove the first frame from the tracks and visibles
+                tracks = tracks[:, 1:]
+                visibles = visibles[:, 1:]
+
+                # Reverse the tracks to match the original video order
+                tracks = np.flip(tracks, 1)
+                visibles = visibles[::-1]
+
 
         else:
             # Convert from (x,y) to (t,y,x), where t = select_frame
@@ -252,7 +262,10 @@ class PointTracker:
 
             # Reverse the tracks to match the original video order
             if track_backward:
-                tracks = tracks[::-1]
+                # Remove the last frame from the tracks and visibles
+                tracks = tracks[:, :-1]
+                visibles = visibles[:, :-1]
+                tracks = np.flip(tracks, 1)
                 visibles = visibles[::-1]
 
             # From resized dimensions back to original image size
