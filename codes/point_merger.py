@@ -77,7 +77,9 @@ class PointMerger(PointLabeler):
                 last_keypoint = self.body_keypoints[len(self.selected_points) - 1]
                 self.selected_points.pop(last_keypoint)  # Remove the last selected
         elif event.key == 'enter':
-            plt.close(self.fig)
+            if len(self.selected_points) == len(self.body_keypoints):
+                plt.close(self.fig)
+
         self.redraw_points()
 
     def overview_on_key(self, event):
@@ -91,12 +93,13 @@ class PointMerger(PointLabeler):
         labeled_points = []
         current_keypoint = self.body_keypoints[len(self.selected_points)]
         for k, v in self.selected_point_sets.items():
-            if current_keypoint in v[self.select_frame].keys():
-                point = v[self.select_frame][current_keypoint]
-            else:
-                point = None
-            if point is not None:
-                labeled_points.append(point)
+            if self.select_frame in v.keys():
+                if current_keypoint in v[self.select_frame].keys():
+                    point = v[self.select_frame][current_keypoint]
+                else:
+                    point = None
+                if point is not None:
+                    labeled_points.append(point)
 
         # Ensure there are visible/labeled points before calculating the average
         if not labeled_points:
@@ -118,6 +121,7 @@ class PointMerger(PointLabeler):
                 self.selected_points[keypoint] = None
 
     def merge_points(self, frame, frame_index, point_sets, task='extreme_keypoints', auto_accept_single=False):
+        self.selected_points = {}
         self.selected_point_sets = point_sets
         self.accept_all_points = False
         self.frame = frame
