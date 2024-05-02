@@ -50,8 +50,15 @@ for video_id in video_ids:
 
     print(f"Found {len(label_sets)} label sets")
 
+    # Collect all labeled frame indices
+    labeled_frame_indices = []
+    for label_set in label_sets:
+        labeled_frame_indices += [int(i) for i in label_sets[label_set].keys()]
+
+    labeled_frame_indices = set(labeled_frame_indices)
+
     # -- Merge each labeled frame set
-    video_object.merge_points(label_sets, 0, args.task, args.accept_single)
+    video_object.merge_points(label_sets, labeled_frame_indices, args.task, args.accept_single)
 
     # -- Save merged points to file
     video_object.save_keypoints_to_csv(merged_folder)

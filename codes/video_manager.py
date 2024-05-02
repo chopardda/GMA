@@ -293,7 +293,8 @@ class VideoObject:
                 x = min(max(x, 0.0), width)
                 y = min(max(y, 0.0), height)
 
-                if self.arranged_tracking_data[i][t]['visible']:
+                # if self.arranged_tracking_data[i][t]['visible']:
+                if True:
                     x1, y1 = np.floor(x).astype(np.int32), np.floor(y).astype(np.int32)
                     x2, y2 = x1 + 1, y1 + 1
 
@@ -347,9 +348,10 @@ class VideoObject:
         video_frame = self.video[frame_index]
 
         point_labeler = PointLabeler()
-        point_labeler.label_points(video_frame, frame_index, task=task)
+        # point_labeler.label_points(video_frame, frame_index, task=task)
+        point_labeler.label_points_adaptive(self, task)
 
-        self.add_keypoint_labels(frame_index, point_labeler.selected_points)
+        self.add_keypoint_labels(point_labeler.select_frame, point_labeler.selected_points)
         self.labeling_task = task
 
     def _get_filename(self, format, tag=None):
@@ -492,10 +494,12 @@ class VideoObject:
 
         return labeled_keypoint_sets
 
-    def merge_points(self, point_sets, frame_index, task='extreme_keypoints', auto_accept_single=False):
+    def merge_points(self, point_sets, labeled_frame_indices, task='extreme_keypoints', auto_accept_single=False):
         point_merger = PointMerger()
-        point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task, auto_accept_single)
-        self.add_keypoint_labels(frame_index, point_merger.selected_points)
+        for frame_index in labeled_frame_indices:
+            point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task, auto_accept_single)
+            self.add_keypoint_labels(frame_index, point_merger.selected_points)
+
         self.labeling_task = task
 
     def track_points(self, tracker, task, labeled_keypoints_folder=None, file_type='json'):
@@ -534,21 +538,32 @@ class VideoObject:
         frame_indices = sorted(self.keypoint_labels.keys())
 
         # Determine absolute frame intervals between the labeled keyframe indices
+        # Use a tuple (start_frame_index, end_frame_index, track_backward) to represent each interval
         if len(frame_indices) > 1:
-            frame_intervals = [(frame_indices[i], frame_indices[i + 1]) for i in range(len(frame_indices) - 1)]
-            frame_intervals.append((frame_indices[-1], len(self.video)))
+            frame_intervals = [(frame_indices[i], frame_indices[i + 1], False) for i in range(len(frame_indices) - 1)]
+            frame_intervals.append((frame_indices[-1], len(self.video), False))
 
         else:
-            frame_intervals = [(frame_indices[0], len(self.video))]
+            frame_intervals = [(frame_indices[0], len(self.video), False)]
+
+        # Check the first frame index, if it is > 0 then insert a new interval from 0 to the first frame index ahead
+        # So far, this is also the only interval that should be tracked backwards
+        if frame_indices[0] > 0:
+            frame_intervals.insert(0, (0, frame_indices[0], True))
 
         for interval in frame_intervals:
-            start_frame_index, end_frame_index = interval
+            start_frame_index, end_frame_index, track_backward = interval
 
-            labelled_keypoints = self.get_keypoint_labels(start_frame_index, task)
+            if track_backward:
+                keypoint_labels_frame = end_frame_index
+            else:
+                keypoint_labels_frame = start_frame_index
+
+            labelled_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task)
 
             # labelled_keypoints is a dictionary with keypoint names as key
             tracks, visibles = tracker.track_selected_points(self.video, start_frame_index, end_frame_index,
-                                                             labelled_keypoints)
+                                                             labelled_keypoints, track_backward)
 
             # Initialize an empty dictionary to store the results as a dictionary, where each value is a list of
             # dictionaries with coordinates x, y and whether the point is visible at this time frame
@@ -556,7 +571,7 @@ class VideoObject:
             tracking_results = {}
 
             # Retrieve the task keypoints for the names
-            task_keypoints = self.get_keypoint_labels(start_frame_index, task).keys()
+            task_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task).keys()
 
             # Loop over each keypoint index and name
             for i, keypoint in enumerate(task_keypoints):
@@ -566,7 +581,16 @@ class VideoObject:
                     visible = visibles[i, frame]
                     tracking_results[keypoint].append({"x": coord[0], "y": coord[1], "visible": bool(visible)})
 
-            self.tracking_data[start_frame_index] = tracking_results
+            self._merge_tracking_data(keypoint_labels_frame, tracking_results)
+
+    def _merge_tracking_data(self, frame_index, tracking_results):
+        if frame_index not in self.tracking_data.keys():
+            self.tracking_data[frame_index] = tracking_results
+
+        else:
+            # Merge in the new tracking results
+            for keypoint, data_list in tracking_results.items():
+                self.tracking_data[frame_index][keypoint] += data_list
 
     def save_tracked_points_to_csv(self, folder):
         filename = os.path.join(folder, f'tracked_points_{self.video_id}.csv')
@@ -576,17 +600,20 @@ class VideoObject:
             writer.writerow(['tracked_from_frame', 'keypoint', 'frame_index', 'x', 'y', 'visible'])
 
             # Iterate through the tracking data and write each point
+            written_frame_counts = {}  # Track how many frames are written per keypoint
+
             for frame_index, tracking_result in self.tracking_data.items():
                 for keypoint, data_list in tracking_result.items():
                     for frame, data in enumerate(data_list):
                         writer.writerow([
                             frame_index,
                             keypoint,
-                            frame + frame_index,
+                            written_frame_counts.get(keypoint, 0),
                             data['x'],
                             data['y'],
                             data['visible']
-                        ])
+                        ]   )
+                        written_frame_counts[keypoint] = written_frame_counts.get(keypoint, 0) + 1
         print('tracking_data saved to', filename)
 
     def save_tracked_points_to_json(self, folder):
@@ -786,7 +813,7 @@ class VideoObject:
 
     def get_arranged_tracking_data(self):
         assert self.tracking_data is not {}, f"No tracked points found"
-        arranged_tracking_data = {keypoint: [] for keypoint in self.tracking_data[0]}
+        arranged_tracking_data = {keypoint: [] for keypoint in self.tracking_data[list(self.tracking_data.keys())[0]]}
 
         for frame_index, data in self.tracking_data.items():
             for keypoint, data_list in data.items():

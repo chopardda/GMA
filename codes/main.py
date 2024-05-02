@@ -1,5 +1,3 @@
-# CUDA_VISIBLE_DEVICES = 0
-
 import os
 import sys
 import argparse
@@ -15,6 +13,8 @@ from video_manager import VideoManager
 
 def main():
     parser = argparse.ArgumentParser(description='Process videos.')
+    parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
+                        help='Task for labeling keypoints.')
     parser.add_argument('--track_only', action='store_true',
                         help='Track keypoints only')
     parser.add_argument('--crop_resize_only', action='store_true',
@@ -32,6 +32,7 @@ def main():
                         help='Path to output directory to save cropped and resized videos.')
     parser.add_argument('--frame_limit', default='auto',
                         help='Limit the number of frames to process on GPU per batch (default: auto)')
+    parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
 
     args = parser.parse_args()
 
@@ -57,8 +58,8 @@ def main():
     # Create point tracker
     tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', args.frame_limit)
 
-    # video_ids = video_manager.get_all_video_ids()
-    video_ids = ['cropped_vid_07_PR_c', 'cropped_vid_01_PR_c']
+    video_ids = video_manager.get_all_video_ids()
+    # video_ids = ['cropped_vid_07_PR_c', 'cropped_vid_01_PR_c']
 
     # --- Track extreme coordinates for cropping
     if not args.crop_resize_only:
@@ -68,9 +69,6 @@ def main():
             # print(f"{'=' * 60}\n")
             video_object = video_manager.get_video_object(video_id)
 
-            # Define starting frame and tracking task (which keypoints to track)
-            task = 'all_body_keypoints'
-
             # Load video
             video_object.load_video()
 
@@ -78,12 +76,18 @@ def main():
             try:
                 video_object.track_points(
                     tracker,
-                    task,
+                    args.task,
                     labeled_keypoints_folder,
                     'json'
                 )
             except ValueError as e:
                 print(e)  # Handle the error appropriately
+
+            except FileNotFoundError as fe:
+                if args.missing_ok:
+                    continue
+                else:
+                    raise fe
 
             # Save tracked points
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
