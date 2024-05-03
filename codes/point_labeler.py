@@ -23,7 +23,8 @@ def create_bodypart_colormap(body_keypoints):
 class PointLabeler:
     NORMAL_TITLE = 'Click to select some points. \n Spacebar to skip points. \n Afterwards, press enter to close the figure.'
     ADAPTIVE_TITLE = ('Click to select some points. \n Spacebar to skip points. \n Afterwards, press enter to close '
-                      'the figure. \n Use the left or right arrows to move to the previous or next frame.')
+                      'the figure. \n Use the left or right arrows to move to the previous or next frame.\n'
+                      'Max frames: {}')
 
     def __init__(self):
         self.select_frame = None
@@ -46,6 +47,8 @@ class PointLabeler:
         # # Stores the positions of each body part for each frame
         # self.keypoint_positions = {}  # { frame_number: { keypoint: (x, y), ...}, ... }
         self.video_object = None
+        self.jump_mode = False
+        self.new_frame_buffer = ""
 
     def setup_figure(self, frame, adaptive=False):
         fig = plt.figure(figsize=(30, 10))
@@ -55,7 +58,7 @@ class PointLabeler:
         ax_image.axis('off')
 
         if adaptive:
-            fig.suptitle(self.ADAPTIVE_TITLE + f' Current frame: {self.select_frame}')
+            fig.suptitle(self.ADAPTIVE_TITLE.format(len(self.video_object.video)) + f' Current frame: {self.select_frame}')
         else:
             fig.suptitle(self.NORMAL_TITLE)
 
@@ -66,7 +69,7 @@ class PointLabeler:
     def _adaptive_update_title(self):
         assert self.fig is not None, "Figure not initialised."
 
-        self.fig.suptitle(self.ADAPTIVE_TITLE + f' Current frame: {self.select_frame}')
+        self.fig.suptitle(self.ADAPTIVE_TITLE.format(len(self.video_object.video)) + f' Current frame: {self.select_frame}')
 
     def update_list(self, ax_list):
         ax_list.clear()
@@ -103,30 +106,53 @@ class PointLabeler:
             self.redraw_points()
 
     def on_key(self, event):
-        if event.key == ' ':
-            current_keypoint = self.body_keypoints[len(self.selected_points)]
-            self.selected_points[current_keypoint] = None  # None for skipped points
-            self.update_list(self.ax_list)
-        elif event.key == 'backspace':
-            if self.selected_points:
-                last_keypoint = self.body_keypoints[len(self.selected_points) - 1]
-                self.selected_points.pop(last_keypoint)  # Remove the last selected
-        elif event.key == 'enter':
-            plt.close(self.fig)
-        elif event.key == 'left':
-            if self.select_frame >= 1:
-                self.select_frame -= 1
-                self.frame = self.video_object.video[self.select_frame]
-                self.selected_points = {}
-                self._adaptive_update_title()
-        elif event.key == 'right':
-            if self.select_frame < len(self.video_object.video) - 1:
-                self.select_frame += 1
-                self.frame = self.video_object.video[self.select_frame]
-                self.selected_points = {}
-                self._adaptive_update_title()
+        if self.jump_mode:
+            if event.key in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                self.new_frame_buffer += event.key
+            elif event.key == 'enter':
+                if self.new_frame_buffer != "":
+                    jump_frame = int(self.new_frame_buffer)
+                    if jump_frame < len(self.video_object.video) -1 and jump_frame >= 0:
+                        self.select_frame = jump_frame
+                        self.frame = self.video_object.video[self.select_frame]
+                        self.selected_points = {}
+                        self._adaptive_update_title()
+                        self.redraw_points()
 
-        self.redraw_points()
+                self.new_frame_buffer = ""
+                self.jump_mode = False
+            elif event.key == 'escape':
+                self.new_frame_buffer = ""
+                self.jump_mode = False
+
+        else:
+            if event.key == ' ':
+                current_keypoint = self.body_keypoints[len(self.selected_points)]
+                self.selected_points[current_keypoint] = None  # None for skipped points
+                self.update_list(self.ax_list)
+            elif event.key == 'backspace':
+                if self.selected_points:
+                    last_keypoint = self.body_keypoints[len(self.selected_points) - 1]
+                    self.selected_points.pop(last_keypoint)  # Remove the last selected
+            elif event.key == 'enter':
+                plt.close(self.fig)
+            elif event.key == 'left':
+                if self.select_frame >= 1:
+                    self.select_frame -= 1
+                    self.frame = self.video_object.video[self.select_frame]
+                    self.selected_points = {}
+                    self._adaptive_update_title()
+            elif event.key == 'right':
+                if self.select_frame < len(self.video_object.video) - 1:
+                    self.select_frame += 1
+                    self.frame = self.video_object.video[self.select_frame]
+                    self.selected_points = {}
+                    self._adaptive_update_title()
+            elif event.key == "j":
+                self.jump_mode = True
+                self.new_frame_buffer = ""
+
+            self.redraw_points()
 
     def label_points(self, frame, frame_index, task='extreme_keypoints'):
         self.frame = frame
