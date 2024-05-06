@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import datetime
+from tqdm import tqdm
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -40,7 +41,7 @@ video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data,
 video_ids = video_manager.get_all_video_ids()
 # video_ids = ['18_FN_c', '07_F-_c']
 
-for video_id in video_ids:
+for video_id in tqdm(video_ids):
     print(f"Labelling process for video {video_id}...")
 
     # -- If labels already present, skip video
