@@ -5,6 +5,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import matplotlib
 
 from tapnet.utils import viz_utils
 
@@ -49,6 +50,19 @@ class PointLabeler:
         self.video_object = None
         self.jump_mode = False
         self.new_frame_buffer = ""
+
+    def _move_figure(self, x, y):
+        """Move figure's upper left corner to pixel (x, y)"""
+        backend = matplotlib.get_backend()
+        if backend == 'TkAgg':
+            self.fig.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
+        elif backend == 'WXAgg':
+            self.fig.canvas.manager.window.SetPosition((x, y))
+        else:
+            # This works for QT and GTK
+            # You can also use window.setGeometry
+            self.fig.canvas.manager.window.move(x, y)
+
 
     def setup_figure(self, frame, adaptive=False):
         fig = plt.figure(figsize=(30, 10))
@@ -155,6 +169,7 @@ class PointLabeler:
             self.redraw_points()
 
     def label_points(self, frame, frame_index, task='extreme_keypoints'):
+        self._move_figure(200, 200)
         self.frame = frame
         self.select_frame = frame_index
         self.selected_points = {}  # reinitialise each time

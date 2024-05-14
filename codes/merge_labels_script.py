@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import datetime
+from tqdm import tqdm
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -38,7 +39,7 @@ video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data,
 
 video_ids = video_manager.get_all_video_ids()
 
-for video_id in video_ids:
+for video_id in tqdm(video_ids):
     print(f"Merging labels for video {video_id}...")
     video_object = video_manager.get_video_object(video_id)
 
