@@ -74,8 +74,8 @@ class OutlierDisplay:
                                   right_point[1] - left_point[1], width=1, color='blue', length_includes_head=True)
 
         self.fig.suptitle(f'Potential outlier for keypoint {keypoint_name} at frame {outlier_frame_index}\n'
-                          f'X diff: {x_diff}, X stddev mul: {x_stddev_mul}\n'
-                          f'Y diff: {y_diff}, Y stddev mul: {y_stddev_mul}\n\n'
+                          f'X diff: {x_diff} of width, X stddev mul: {x_stddev_mul}\n'
+                          f'Y diff: {y_diff} of height, Y stddev mul: {y_stddev_mul}\n\n'
                           f'Press Enter to confirm as an outlier, 1 to indicate as initial outlier, 2 to indicate as '
                           f'already an outlier and 3 to indicate as returning to place')
 

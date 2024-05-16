@@ -801,12 +801,20 @@ class VideoObject:
             self.release_video()
 
     def get_tracked_points_deltas(self):
+        # Get video dimensions to make deltas relative
+        if self.video is None:
+            self.load_video()
+
+        width, height = self.video.shape[2], self.video.shape[1]
+
+        self.release_video()
+
         # Return the difference between successive frames for each tracked point
         frame_deltas = {keypoint: [] for keypoint in self.arranged_tracking_data}
         for keypoint, data_list in self.arranged_tracking_data.items():
             for i, data in enumerate(data_list[:-1]):
-                x_diff = abs(data['x'] - data_list[i + 1]['x'])
-                y_diff = abs(data['y'] - data_list[i + 1]['y'])
+                x_diff = abs(data['x'] - data_list[i + 1]['x']) / width
+                y_diff = abs(data['y'] - data_list[i + 1]['y']) / height
                 frame_deltas[keypoint].append((x_diff, y_diff))
 
         return frame_deltas
