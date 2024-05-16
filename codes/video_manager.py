@@ -551,6 +551,11 @@ class VideoObject:
         if frame_indices[0] > 0:
             frame_intervals.insert(0, (0, frame_indices[0], True))
 
+        # If there are multiple labeled frame indices, the first labeled frame is 0, and the second frame has more
+        # labeled points, then add an interval tracking these extra points backward to frame 0
+        if len(frame_indices) > 1 and len(self.keypoint_labels[frame_indices[1]]) > len(self.keypoint_labels[frame_indices[0]]):
+            frame_intervals.append((0, frame_indices[1], True))
+
         for interval in frame_intervals:
             start_frame_index, end_frame_index, track_backward = interval
 
@@ -560,6 +565,13 @@ class VideoObject:
                 keypoint_labels_frame = start_frame_index
 
             labelled_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task)
+
+            # If tracking backwards, and the set of keys for start and end frames both exist but are different, then
+            # only track the keys in the difference
+            if track_backward:
+                labelled_keypoints_start = self.get_keypoint_labels(start_frame_index, task)
+                labelled_keypoints_end = self.get_keypoint_labels(end_frame_index, task)
+                labelled_keypoints = {k: v for k, v in labelled_keypoints_end.items() if k not in labelled_keypoints_start}
 
             # labelled_keypoints is a dictionary with keypoint names as key
             tracks, visibles = tracker.track_selected_points(self.video, start_frame_index, end_frame_index,
@@ -571,7 +583,7 @@ class VideoObject:
             tracking_results = {}
 
             # Retrieve the task keypoints for the names
-            task_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task).keys()
+            task_keypoints = labelled_keypoints.keys()
 
             # Loop over each keypoint index and name
             for i, keypoint in enumerate(task_keypoints):
@@ -821,10 +833,14 @@ class VideoObject:
 
     def get_arranged_tracking_data(self):
         assert self.tracking_data is not {}, f"No tracked points found"
-        arranged_tracking_data = {keypoint: [] for keypoint in self.tracking_data[list(self.tracking_data.keys())[0]]}
+        # arranged_tracking_data = {keypoint: [] for keypoint in self.tracking_data[list(self.tracking_data.keys())[0]]}
+        arranged_tracking_data = {}
 
         for frame_index, data in self.tracking_data.items():
             for keypoint, data_list in data.items():
+                if keypoint not in arranged_tracking_data:
+                    arranged_tracking_data[keypoint] = []
+
                 arranged_tracking_data[keypoint] += [
                     {'x': data_elem['x'], 'y': data_elem['y'], 'visible': data_elem['visible']} for data_elem
                     in data_list]
