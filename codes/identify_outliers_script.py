@@ -24,10 +24,13 @@ parser.add_argument("--save_figures", action="store_true", default=False, help="
 parser.add_argument('--tracked_kp_path', default='./output/tracked',
                     help='Path to tracked keypoints')
 parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
+parser.add_argument('--video_path',
+                    default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    help='Path to directory containing videos.')
 
 args = parser.parse_args()
 
-video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
+video_folder = args.video_path
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
