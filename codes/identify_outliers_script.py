@@ -38,17 +38,6 @@ video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data,
 video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
 video_ids = video_manager.get_all_video_ids()
 
-print("Gathering video statistics...")
-keypoint_frame_deltas = {}
-
-for video_id in video_ids:
-    video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas()
-
-    for keypoint, deltas in video_frame_deltas.items():
-        if keypoint not in keypoint_frame_deltas:
-            keypoint_frame_deltas[keypoint] = []
-        keypoint_frame_deltas[keypoint] += deltas
-
 # Check if distribution of point movement is saved
 if os.path.exists("./keypoint_distributions.pkl"):
     print("Loading existing distribution data")
@@ -56,7 +45,17 @@ if os.path.exists("./keypoint_distributions.pkl"):
         keypoint_distributions = pickle.load(f)
 
 else:
-    print("Calculating distribution of point movement")
+    print("Gathering video statistics...")
+    keypoint_frame_deltas = {}
+
+    for video_id in video_ids:
+        video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas()
+
+        for keypoint, deltas in video_frame_deltas.items():
+            if keypoint not in keypoint_frame_deltas:
+                keypoint_frame_deltas[keypoint] = []
+            keypoint_frame_deltas[keypoint] += deltas
+
     # Calculate distribution of point movement
     keypoint_distributions = {}
 
