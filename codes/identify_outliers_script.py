@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import pickle
 import numpy as np
 from tqdm import tqdm
 
@@ -48,33 +49,46 @@ for video_id in video_ids:
             keypoint_frame_deltas[keypoint] = []
         keypoint_frame_deltas[keypoint] += deltas
 
-# Calculate distribution of point movement
-keypoint_distributions = {}
+# Check if distribution of point movement is saved
+if os.path.exists("./keypoint_distributions.pkl"):
+    print("Loading existing distribution data")
+    with open("./keypoint_distributions.pkl", "rb") as f:
+        keypoint_distributions = pickle.load(f)
 
-for keypoint, deltas in keypoint_frame_deltas.items():
-    # Process x and y coordinates of each keypoint
-    x_deltas = [delta[0] for delta in deltas]
-    y_deltas = [delta[1] for delta in deltas]
+else:
+    print("Calculating distribution of point movement")
+    # Calculate distribution of point movement
+    keypoint_distributions = {}
 
-    # Calculate the mean and standard deviation of the x and y deltas
-    x_mean = np.mean(x_deltas)
-    x_std = np.std(x_deltas)
-    y_mean = np.mean(y_deltas)
-    y_std = np.std(y_deltas)
+    for keypoint, deltas in keypoint_frame_deltas.items():
+        # Process x and y coordinates of each keypoint
+        x_deltas = [delta[0] for delta in deltas]
+        y_deltas = [delta[1] for delta in deltas]
 
-    # Save the results
-    keypoint_distributions[keypoint] = {
-        "x_mean": x_mean,
-        "x_std": x_std,
-        "y_mean": y_mean,
-        "y_std": y_std
-    }
+        # Calculate the mean and standard deviation of the x and y deltas
+        x_mean = np.mean(x_deltas)
+        x_std = np.std(x_deltas)
+        y_mean = np.mean(y_deltas)
+        y_std = np.std(y_deltas)
 
-    # Print the results
-    print(f"Key point: {keypoint}")
-    print(f"X mean: {x_mean}, X std: {x_std}")
-    print(f"Y mean: {y_mean}, Y std: {y_std}")
-    print("")
+        # Save the results
+        keypoint_distributions[keypoint] = {
+            "x_mean": x_mean,
+            "x_std": x_std,
+            "y_mean": y_mean,
+            "y_std": y_std
+        }
+
+        # Print the results
+        print(f"Key point: {keypoint}")
+        print(f"X mean: {x_mean}, X std: {x_std}")
+        print(f"Y mean: {y_mean}, Y std: {y_std}")
+        print("")
+
+    # Save the keypoint_distributions
+    with open("./keypoint_distributions.pkl", "wb") as f:
+        pickle.dump(keypoint_distributions, f)
+
 
 # Count the number of frames where the point moved more than the threshold * stddev from the mean
 outliers = {}
