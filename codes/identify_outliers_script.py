@@ -90,39 +90,51 @@ else:
 
 
 # Count the number of frames where the point moved more than the threshold * stddev from the mean
-outliers = {}
-outlier_count = 0
+if os.path.exists("./output/outliers/outliers.pkl"):
+    print("Loading existing outlier data")
+    with open("./output/outliers/outliers.pkl", "rb") as f:
+        outliers = pickle.load(f)
+        outlier_counts = [[len(x) for x in list(outliers[video_id].values())] for video_id in outliers]
+        outlier_count = sum([sum(x) for x in outlier_counts])
 
-for video_id in video_ids:
-    video_object = video_manager.get_video_object(video_id)
-    video_frame_deltas = video_object.get_tracked_points_deltas()
-    outliers[video_id] = {}
+else:
+    outliers = {}
+    outlier_count = 0
 
-    for keypoint, deltas in video_frame_deltas.items():
-        x_deltas = [delta[0] for delta in deltas]
-        y_deltas = [delta[1] for delta in deltas]
+    for video_id in video_ids:
+        video_object = video_manager.get_video_object(video_id)
+        video_frame_deltas = video_object.get_tracked_points_deltas()
+        outliers[video_id] = {}
 
-        x_mean = keypoint_distributions[keypoint]["x_mean"]
-        x_std = keypoint_distributions[keypoint]["x_std"]
-        y_mean = keypoint_distributions[keypoint]["y_mean"]
-        y_std = keypoint_distributions[keypoint]["y_std"]
+        for keypoint, deltas in video_frame_deltas.items():
+            x_deltas = [delta[0] for delta in deltas]
+            y_deltas = [delta[1] for delta in deltas]
 
-        x_diffs = np.abs(x_deltas - x_mean)
-        y_diffs = np.abs(y_deltas - y_mean)
-        x_outliers = np.where(x_diffs > args.stddev_threshold * x_std)[0]
-        y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
+            x_mean = keypoint_distributions[keypoint]["x_mean"]
+            x_std = keypoint_distributions[keypoint]["x_std"]
+            y_mean = keypoint_distributions[keypoint]["y_mean"]
+            y_std = keypoint_distributions[keypoint]["y_std"]
 
-        outlier_set = set(x_outliers).union(set(y_outliers))
+            x_diffs = np.abs(x_deltas - x_mean)
+            y_diffs = np.abs(y_deltas - y_mean)
+            x_outliers = np.where(x_diffs > args.stddev_threshold * x_std)[0]
+            y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
 
-        if len(outlier_set) > 0:
-            outliers[video_id][keypoint] = [
-                (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
-                 y_diffs[i] / y_std) for i in
-                outlier_set]
-            outlier_count += len(outlier_set)
+            outlier_set = set(x_outliers).union(set(y_outliers))
 
-    if len(outliers[video_id]) == 0:
-        outliers.pop(video_id)
+            if len(outlier_set) > 0:
+                outliers[video_id][keypoint] = [
+                    (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
+                     y_diffs[i] / y_std) for i in
+                    outlier_set]
+                outlier_count += len(outlier_set)
+
+        if len(outliers[video_id]) == 0:
+            outliers.pop(video_id)
+
+    # Save outliers
+    with open(f"./output/outliers/outliers.pkl", "wb") as f:
+        pickle.dump(outliers, f)
 
 print(f"Found {outlier_count} outliers")
 
