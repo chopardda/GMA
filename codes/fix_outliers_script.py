@@ -49,7 +49,7 @@ for video_id in tqdm(video_ids):
         outliers = video_object.get_sorted_outlier_table()
         relabeler = PointRelabeler()
         video_object.load_video()
-        video_object.load_keypoint_labels_from_folder(args.labeled_kp_path, file_type='csv')
+        video_object.load_keypoint_labels_from_folder(args.labeled_kp_path, task=args.task, file_type='csv')
 
         # Handle the case where the outlier immediately returns to the correct place in the following frame
         one_offs = video_object.get_one_off_outliers()
