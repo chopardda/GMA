@@ -13,6 +13,7 @@ class PointRelabeler(PointLabeler):
         self.current_point = None
         self.title_text = PointRelabeler.TITLE_BASE
         self.old_color = None
+        self.point_buffer = ""
 
     def setup_figure(self, frame):
         fig = plt.figure(figsize=(20, 10))
@@ -33,7 +34,7 @@ class PointRelabeler(PointLabeler):
             color = self.colormap[keypoint]
             if keypoint in self.selected_points:
                 text += str(self.selected_points[keypoint])
-            ax_list.text(0, 1 - (i * 0.1), text, va='top', ha='left', fontsize=12, color=color)
+            ax_list.text(0, 1 - (i * 0.05), text, va='top', ha='left', fontsize=12, color=color)
         ax_list.figure.canvas.draw()
 
     def on_click(self, event):
@@ -43,6 +44,7 @@ class PointRelabeler(PointLabeler):
                 self.selected_points[self.current_point] = np.array([x, y])
                 self.colormap[self.current_point] = self.old_color
                 self.current_point = None
+                self.point_buffer = ""
                 self.old_color = None
                 self.redraw_points()
         else:
@@ -62,18 +64,28 @@ class PointRelabeler(PointLabeler):
 
     def on_key(self, event):
         if self.current_point is None:
-            if event.key in ['0', '1', '2', '3', '4', '5', '6', '7', '8']:
-                self.current_point = self.body_keypoints[int(event.key)]
-                self.old_color = self.colormap[self.current_point]
-                self.colormap[self.current_point] = 'red'
-                self.redraw_points()
+            if event.key in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                self.point_buffer += event.key
+
+            elif event.key == ' ':
+                if int(self.point_buffer) < self.max_n_points - 1:
+                    self.current_point = self.body_keypoints[int(self.point_buffer)]
+                    self.old_color = self.colormap[self.current_point]
+                    self.colormap[self.current_point] = 'red'
+                    self.redraw_points()
+                else:
+                    print(f"Invalid point number. Please enter a number between 0 and {self.max_n_points - 1}")
+                    self.point_buffer = ""
 
             elif event.key == 'enter':
+                self.current_point = None
+                self.point_buffer = ""
                 plt.close(self.fig)
 
         elif event.key == 'escape':
             self.colormap[self.current_point] = self.old_color
             self.current_point = None
+            self.point_buffer = ""
             self.old_color = None
             self.redraw_points()
 
