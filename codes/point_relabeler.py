@@ -68,13 +68,13 @@ class PointRelabeler(PointLabeler):
                 self.point_buffer += event.key
 
             elif event.key == ' ':
-                if int(self.point_buffer) < self.max_n_points - 1:
+                if int(self.point_buffer) < self.max_n_points:
                     self.current_point = self.body_keypoints[int(self.point_buffer)]
                     self.old_color = self.colormap[self.current_point]
                     self.colormap[self.current_point] = 'red'
                     self.redraw_points()
                 else:
-                    print(f"Invalid point number. Please enter a number between 0 and {self.max_n_points - 1}")
+                    print(f"Invalid point number {int(self.point_buffer)}. Please enter a number between 0 and {self.max_n_points - 1}")
                     self.point_buffer = ""
 
             elif event.key == 'enter':
@@ -83,6 +83,14 @@ class PointRelabeler(PointLabeler):
                 plt.close(self.fig)
 
         elif event.key == 'escape':
+            self.colormap[self.current_point] = self.old_color
+            self.current_point = None
+            self.point_buffer = ""
+            self.old_color = None
+            self.redraw_points()
+
+        elif event.key == 'backspace':
+            self.selected_points[self.current_point] = None
             self.colormap[self.current_point] = self.old_color
             self.current_point = None
             self.point_buffer = ""
