@@ -21,10 +21,12 @@ parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'
                     help='Task for labeling keypoints.')
 parser.add_argument('--output_path', default='./output/relabeled',
                     help='Path to output directory for saving labelled data files.')
+parser.add_argument('--video_path', default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    help='Path to folder containing videos.')
 
 args = parser.parse_args()
 
-video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
+video_folder = args.video_path
 output_folder = args.output_path
 
 if not os.path.exists(output_folder):
