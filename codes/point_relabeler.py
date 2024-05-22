@@ -52,10 +52,11 @@ class PointRelabeler(PointLabeler):
             x, y = event.xdata, event.ydata
             min_dist = float('inf')
             for keypoint, point in self.selected_points.items():
-                dist = np.linalg.norm(np.array([x, y]) - point)
-                if dist < min_dist:
-                    self.current_point = keypoint
-                    min_dist = dist
+                if point is not None:
+                    dist = np.linalg.norm(np.array([x, y]) - point)
+                    if dist < min_dist:
+                        self.current_point = keypoint
+                        min_dist = dist
 
             self.old_color = self.colormap[self.current_point]
             self.colormap[self.current_point] = 'red'
