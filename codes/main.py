@@ -33,6 +33,7 @@ def main():
     parser.add_argument('--frame_limit', default='auto',
                         help='Limit the number of frames to process on GPU per batch (default: auto)')
     parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
+    parser.add_argument('--specific_video', default=None, help='Process a specific video (e.g. cropped_vid_01_PR_c')
 
     args = parser.parse_args()
 
@@ -64,6 +65,9 @@ def main():
     # --- Track extreme coordinates for cropping
     if not args.crop_resize_only:
         for video_id in video_ids:
+            if args.specific_video is not None and args.specific_video != video_id:
+                continue
+
             # print(f"\n{'=' * 60}")
             print(f"Keypoint tracking for video {video_id}...")
             # print(f"{'=' * 60}\n")
@@ -98,6 +102,9 @@ def main():
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
+            if args.specific_video is not None and args.specific_video != video_id:
+                continue
+
             print(f"Cropping and resizing video {video_id}...")
             video_object = video_manager.get_video_object(video_id)
 

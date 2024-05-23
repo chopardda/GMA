@@ -68,6 +68,7 @@ for video_id in tqdm(video_ids):
         # Store a list of already labelled frames, they don't need to be labeled more than once
         labelled_frames = []
 
+        pbar = tqdm(total=len(outliers))
         for idx, outlier in outliers.iterrows():
             outlier_frame_index = outlier['Outlier frame index'] + 1
 
@@ -80,6 +81,9 @@ for video_id in tqdm(video_ids):
                                      point_set, outlier['Keypoint'], args.task)
 
             video_object.add_keypoint_labels(outlier_frame_index, relabeler.selected_points)
+            pbar.update(1)
+
+        pbar.close()
 
         # -- Save labelled points to file
         video_object.save_keypoints_to_csv(output_folder)
