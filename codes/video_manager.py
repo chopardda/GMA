@@ -534,27 +534,22 @@ class VideoObject:
                 raise ValueError(f"Keypoint labels are not already loaded, "
                                  f"please provide labelled keypoint folder.")
 
-        # Get ascending set of frame indices in the keypoint labels
-        frame_indices = sorted(self.keypoint_labels.keys())
+        # Build a dictionary of keypoints, each key having a list of frames where this keypoint is lableled
+        keypoint_frames = defaultdict(lambda: np.zeros(len(self.video)))
+        for frame_index, keypoints in self.keypoint_labels.items():
+            for keypoint in keypoints.keys():
+                keypoint_frames[keypoint][frame_index] = 1
 
-        # Determine absolute frame intervals between the labeled keyframe indices
-        # Use a tuple (start_frame_index, end_frame_index, track_backward) to represent each interval
-        if len(frame_indices) > 1:
-            frame_intervals = [(frame_indices[i], frame_indices[i + 1], False) for i in range(len(frame_indices) - 1)]
-            frame_intervals.append((frame_indices[-1], len(self.video), False))
+        # Create a list of frame intervals of the format: [(start_frame, end_frame, [labeled points], track_backward), ...]
+        interval_dict = {}
+        for keypoint, frames in keypoint_frames.items():
+            # Identify the indices in frames where the keypoint is labeled
+            labeled_indices = np.where(frames == 1)[0]
+            num_labeled_indices = len(labeled_indices)
 
-        else:
-            frame_intervals = [(frame_indices[0], len(self.video), False)]
+            for i, idx in enumerate(labeled_indices):
+                #
 
-        # Check the first frame index, if it is > 0 then insert a new interval from 0 to the first frame index ahead
-        # So far, this is also the only interval that should be tracked backwards
-        if frame_indices[0] > 0:
-            frame_intervals.insert(0, (0, frame_indices[0], True))
-
-        # If there are multiple labeled frame indices, the first labeled frame is 0, and the second frame has more
-        # labeled points, then add an interval tracking these extra points backward to frame 0
-        if len(frame_indices) > 1 and len(self.keypoint_labels[frame_indices[1]]) > len(self.keypoint_labels[frame_indices[0]]):
-            frame_intervals.append((0, frame_indices[1], True))
 
         for interval in frame_intervals:
             start_frame_index, end_frame_index, track_backward = interval
@@ -571,7 +566,12 @@ class VideoObject:
             if track_backward:
                 labelled_keypoints_start = self.get_keypoint_labels(start_frame_index, task)
                 labelled_keypoints_end = self.get_keypoint_labels(end_frame_index, task)
-                labelled_keypoints = {k: v for k, v in labelled_keypoints_end.items() if k not in labelled_keypoints_start}
+
+                if labelled_keypoints_start != labelled_keypoints_end:
+                    labelled_keypoints = {k: v for k, v in labelled_keypoints_end.items() if k not in labelled_keypoints_start}
+
+                else:
+                    labelled_keypoints = labelled_keypoints_start
 
             # labelled_keypoints is a dictionary with keypoint names as key
             tracks, visibles = tracker.track_selected_points(self.video, start_frame_index, end_frame_index,
