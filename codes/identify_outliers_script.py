@@ -33,9 +33,13 @@ args = parser.parse_args()
 
 video_folder = args.video_path
 
+# Ensure outliers directory exists
+if not os.path.exists("./output/outliers"):
+    os.makedirs("./output/outliers")
+
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
-video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
+video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok, file_type='csv')
 video_ids = video_manager.get_all_video_ids()
 
 # Check if distribution of point movement is saved

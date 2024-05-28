@@ -340,7 +340,7 @@ class VideoObject:
         # selected_keypoints = task_keypoints.get(task, [])
         frame_keypoints = self.keypoint_labels.get(frame_index, {})
 
-        return {k: np.array([frame_keypoints[k]['x'], frame_keypoints[k]['y']])
+        return {k: np.array([frame_keypoints[k][0], frame_keypoints[k][1]])
                 for k in task_keypoints.get(task, []) if k in frame_keypoints}
 
     def label_and_store_keypoints(self, frame_index, task='extreme_keypoints'):
@@ -540,19 +540,35 @@ class VideoObject:
             for keypoint in keypoints.keys():
                 keypoint_frames[keypoint][frame_index] = 1
 
-        # Create a list of frame intervals of the format: [(start_frame, end_frame, [labeled points], track_backward), ...]
-        interval_dict = {}
+        # Collect intervals to track, both forwards and backwards
+        interval_dict = defaultdict(list)
         for keypoint, frames in keypoint_frames.items():
             # Identify the indices in frames where the keypoint is labeled
             labeled_indices = np.where(frames == 1)[0]
             num_labeled_indices = len(labeled_indices)
 
             for i, idx in enumerate(labeled_indices):
-                #
+                # If this is the first labeled frame, and it is not the first frame, track backwards before tracking
+                # forwards
+                if i == 0 and idx > 0:
+                    interval_dict[(0, idx, True)].append(keypoint)
 
+                # If this is not the last labeled frame, track forwards until the next labeled frame
+                if i < num_labeled_indices - 1:
+                    interval_dict[(idx, labeled_indices[i + 1], False)].append(keypoint)
+
+                # Else if this is the last labeled frame, track forwards until the end of the video
+                elif i == num_labeled_indices - 1:
+                    interval_dict[(idx, len(self.video), False)].append(keypoint)
+
+        # Convert interval_dict to a list of frame intervals of the format: [(start_frame, end_frame, [labeled points], track_backward), ...]
+        frame_intervals = []
+        for interval, points in interval_dict.items():
+            start_frame, end_frame, track_backward = interval
+            frame_intervals.append((start_frame, end_frame, points, track_backward))
 
         for interval in frame_intervals:
-            start_frame_index, end_frame_index, track_backward = interval
+            start_frame_index, end_frame_index, points, track_backward = interval
 
             if track_backward:
                 keypoint_labels_frame = end_frame_index
@@ -560,18 +576,7 @@ class VideoObject:
                 keypoint_labels_frame = start_frame_index
 
             labelled_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task)
-
-            # If tracking backwards, and the set of keys for start and end frames both exist but are different, then
-            # only track the keys in the difference
-            if track_backward:
-                labelled_keypoints_start = self.get_keypoint_labels(start_frame_index, task)
-                labelled_keypoints_end = self.get_keypoint_labels(end_frame_index, task)
-
-                if labelled_keypoints_start != labelled_keypoints_end:
-                    labelled_keypoints = {k: v for k, v in labelled_keypoints_end.items() if k not in labelled_keypoints_start}
-
-                else:
-                    labelled_keypoints = labelled_keypoints_start
+            labelled_keypoints = {k: v for k, v in labelled_keypoints.items() if k in points}  # Only keep the points in the interval
 
             # labelled_keypoints is a dictionary with keypoint names as key
             tracks, visibles = tracker.track_selected_points(self.video, start_frame_index, end_frame_index,
@@ -593,16 +598,23 @@ class VideoObject:
                     visible = visibles[i, frame]
                     tracking_results[keypoint].append({"x": coord[0], "y": coord[1], "visible": bool(visible)})
 
-            self._merge_tracking_data(keypoint_labels_frame, tracking_results)
+            self._merge_tracking_data(keypoint_labels_frame, tracking_results, track_backward)
 
-    def _merge_tracking_data(self, frame_index, tracking_results):
+    def _merge_tracking_data(self, frame_index, tracking_results, track_backward):
         if frame_index not in self.tracking_data.keys():
             self.tracking_data[frame_index] = tracking_results
 
         else:
             # Merge in the new tracking results
             for keypoint, data_list in tracking_results.items():
-                self.tracking_data[frame_index][keypoint] += data_list
+                if keypoint in self.tracking_data[frame_index]:
+                    # If tracking backward, prepend the new data to the existing data
+                    if track_backward:
+                        self.tracking_data[frame_index][keypoint] = data_list + self.tracking_data[frame_index][keypoint]
+                    else:
+                        self.tracking_data[frame_index][keypoint] += data_list
+                else:
+                    self.tracking_data[frame_index][keypoint] = data_list
 
     def save_tracked_points_to_csv(self, folder):
         filename = os.path.join(folder, f'tracked_points_{self.video_id}.csv')
@@ -614,7 +626,8 @@ class VideoObject:
             # Iterate through the tracking data and write each point
             written_frame_counts = {}  # Track how many frames are written per keypoint
 
-            for frame_index, tracking_result in self.tracking_data.items():
+            for frame_index in sorted(self.tracking_data.keys()):
+                tracking_result = self.tracking_data[frame_index]
                 for keypoint, data_list in tracking_result.items():
                     for frame, data in enumerate(data_list):
                         writer.writerow([

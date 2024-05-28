@@ -82,7 +82,7 @@ def main():
                     tracker,
                     args.task,
                     labeled_keypoints_folder,
-                    'json'
+                    'csv'
                 )
             except ValueError as e:
                 print(e)  # Handle the error appropriately
@@ -95,7 +95,7 @@ def main():
 
             # Save tracked points
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
-            video_object.save_tracked_points_to_json(tracked_keypoints_folder)
+            # video_object.save_tracked_points_to_json(tracked_keypoints_folder)
 
             video_object.release_video()
 
@@ -115,7 +115,7 @@ def main():
 
             # - Option B: implicitly load the tracked points when updating the coordinates.
             # Note: not needed if extreme_coordinated already loaded in video_object
-            video_object.update_extreme_coordinates(tracked_keypoints_folder)
+            video_object.update_extreme_coordinates(tracked_keypoints_folder, 'csv')
             print(video_object.extreme_coordinates)
 
             # -- Crop video and save to cropped_videos folder
