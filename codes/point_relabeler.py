@@ -5,9 +5,15 @@ from point_labeler import PointLabeler
 
 
 class PointRelabeler(PointLabeler):
+    TITLE_BASE = ('Use the number keys or click on a point to redefine, and then click to choose the new location. \n '
+                  'Afterwards, press enter to close the figure.')
+
     def __init__(self):
         super().__init__()
         self.current_point = None
+        self.title_text = PointRelabeler.TITLE_BASE
+        self.old_color = None
+        self.point_buffer = ""
 
     def setup_figure(self, frame):
         fig = plt.figure(figsize=(20, 10))
@@ -15,8 +21,7 @@ class PointRelabeler(PointLabeler):
         ax_list = fig.add_subplot(122)
         ax_image.imshow(frame)  # self.video_data.video[self.select_frame])
         ax_image.axis('off')
-        fig.suptitle('Use the number keys to choose a point to redefine, and the click to choose the new location. \n'
-                     'Afterwards, press enter to close the figure.')
+        fig.suptitle(self.title_text)
         ax_list.axis('off')
         self.update_list(ax_list)
         return fig, ax_image, ax_list
@@ -25,11 +30,11 @@ class PointRelabeler(PointLabeler):
         ax_list.clear()
         ax_list.axis('off')
         for i, keypoint in enumerate(self.body_keypoints):
-            text = f'{i}. keypoint: '
+            text = f'{i}. {keypoint}: '
             color = self.colormap[keypoint]
             if keypoint in self.selected_points:
                 text += str(self.selected_points[keypoint])
-            ax_list.text(0, 1 - (i * 0.1), text, va='top', ha='left', fontsize=12, color=color)
+            ax_list.text(0, 1 - (i * 0.05), text, va='top', ha='left', fontsize=12, color=color)
         ax_list.figure.canvas.draw()
 
     def on_click(self, event):
@@ -37,23 +42,68 @@ class PointRelabeler(PointLabeler):
             if event.inaxes == self.ax_image:
                 x, y = int(np.round(event.xdata)), int(np.round(event.ydata))
                 self.selected_points[self.current_point] = np.array([x, y])
-                self.redraw_points()
+                self.colormap[self.current_point] = self.old_color
                 self.current_point = None
+                self.point_buffer = ""
+                self.old_color = None
+                self.redraw_points()
+        else:
+            # Find the closest point to click event
+            x, y = event.xdata, event.ydata
+            min_dist = float('inf')
+            for keypoint, point in self.selected_points.items():
+                if point is not None:
+                    dist = np.linalg.norm(np.array([x, y]) - point)
+                    if dist < min_dist:
+                        self.current_point = keypoint
+                        min_dist = dist
+
+            self.old_color = self.colormap[self.current_point]
+            self.colormap[self.current_point] = 'red'
+            self.redraw_points()
+
 
     def on_key(self, event):
         if self.current_point is None:
-            if event.key in ['0', '1', '2', '3', '4', '5', '6', '7', '8']:
-                self.current_point = self.body_keypoints[int(event.key)]
+            if event.key in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                self.point_buffer += event.key
+
+            elif event.key == ' ':
+                if int(self.point_buffer) < self.max_n_points:
+                    self.current_point = self.body_keypoints[int(self.point_buffer)]
+                    self.old_color = self.colormap[self.current_point]
+                    self.colormap[self.current_point] = 'red'
+                    self.redraw_points()
+                else:
+                    print(f"Invalid point number {int(self.point_buffer)}. Please enter a number between 0 and {self.max_n_points - 1}")
+                    self.point_buffer = ""
 
             elif event.key == 'enter':
+                self.current_point = None
+                self.point_buffer = ""
                 plt.close(self.fig)
 
-            elif event.key == 'escape':
-                self.current_point = None
+        elif event.key == 'escape':
+            self.colormap[self.current_point] = self.old_color
+            self.current_point = None
+            self.point_buffer = ""
+            self.old_color = None
+            self.redraw_points()
 
-    def relabel_points(self, frame, frame_index, current_points, task='extreme_keypoints'):
+        elif event.key == 'backspace':
+            self.selected_points[self.current_point] = None
+            self.colormap[self.current_point] = self.old_color
+            self.current_point = None
+            self.point_buffer = ""
+            self.old_color = None
+            self.redraw_points()
+
+    def relabel_points(self, frame, outlier_frame_index, current_points, keypoint, task='extreme_keypoints'):
         self.frame = frame
-        self.select_frame = frame_index
+        self.select_frame = outlier_frame_index
+
+        # Update title
+        self.title_text = PointRelabeler.TITLE_BASE + f'\n Detected outlier: {keypoint}, frame: {outlier_frame_index} at x: {current_points[keypoint][0]}, y: {current_points[keypoint][1]}'
 
         # Copy current_points into selected_points
         self.selected_points = current_points.copy()

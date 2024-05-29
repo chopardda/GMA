@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import datetime
+from tqdm import tqdm
 
 current_script_path = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_script_path)
@@ -38,7 +39,7 @@ video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data,
 
 video_ids = video_manager.get_all_video_ids()
 
-for video_id in video_ids:
+for video_id in tqdm(video_ids):
     print(f"Merging labels for video {video_id}...")
     video_object = video_manager.get_video_object(video_id)
 
@@ -50,8 +51,15 @@ for video_id in video_ids:
 
     print(f"Found {len(label_sets)} label sets")
 
+    # Collect all labeled frame indices
+    labeled_frame_indices = []
+    for label_set in label_sets:
+        labeled_frame_indices += [int(i) for i in label_sets[label_set].keys()]
+
+    labeled_frame_indices = set(labeled_frame_indices)
+
     # -- Merge each labeled frame set
-    video_object.merge_points(label_sets, 0, args.task, args.accept_single)
+    video_object.merge_points(label_sets, labeled_frame_indices, args.task, args.accept_single)
 
     # -- Save merged points to file
     video_object.save_keypoints_to_csv(merged_folder)

@@ -5,9 +5,11 @@ import mediapy as media
 import numpy as np
 import os
 import glob
+import seaborn as sns
 
 from collections import defaultdict
 from PIL import Image
+import pandas as pd
 from point_labeler import PointLabeler
 from point_merger import PointMerger
 
@@ -146,6 +148,12 @@ class VideoManager:
                     # Remove video from collection
                     self.video_collection.pop(video_id)
 
+    def load_all_outlier_data(self, outlier_data_folder):
+        video_keys = list(self.video_collection.keys())
+        for video_id in video_keys:
+            self.video_collection[video_id].load_outlier_data_from_folder(outlier_data_folder)
+
+
 #################################################
 ############# VideoObject Class ################
 #################################################
@@ -161,9 +169,37 @@ class VideoObject:
 
         self.keypoint_labels = {}  # Stores point labels for each video {frame_index: labels, ...}
         self.tracking_data = {}  # Stores tracked points {'point': [{'x': x_val, 'y':y_val, 'visible': bool), ...], ...}
+        self.arranged_tracking_data = {}
         self.extreme_coordinates = {}  # Format: {leftmost: , topmost: , rightmost: , bottommost: }
 
         self.labeling_task = None
+
+        self.outlier_data = None
+        self.colour_map = VideoObject._get_colour_map()
+
+    @staticmethod
+    def _get_colour_map():
+        full_set_body_keypoints = ['nose',
+                                   'head bottom', 'head top',
+                                   'left ear', 'right ear',
+                                   'left shoulder', 'right shoulder',
+                                   'left elbow', 'right elbow',
+                                   'left wrist', 'right wrist',
+                                   'left hip', 'right hip',
+                                   'left knee', 'right knee',
+                                   'left ankle', 'right ankle']
+        # Use a matplotlib colormap
+        colorpalette = sns.color_palette("hls",
+                                         len(full_set_body_keypoints))  # 'tab20' is a good palette for distinct colors
+
+        for i in range(len(colorpalette)):
+            colorpalette[i] = tuple([int(255 * x) for x in colorpalette[i]])
+
+        bodypart_colors = {
+            full_set_body_keypoints[i]: colorpalette[i] for i in range(len(full_set_body_keypoints))
+        }
+
+        return bodypart_colors
 
     def load_video(self):
         """
@@ -211,6 +247,80 @@ class VideoObject:
                 # Handle specific exceptions related to loading failures
                 raise NoVideoLoadedError("Video not loaded and automatic video loading failed. Error: " + str(e))
 
+    def show_video_with_tracks(self):
+        assert self.arranged_tracking_data is not {}, "No tracking data available for this video."
+
+        # Ensure video is loaded
+        self.load_video()
+
+        num_points = len(self.arranged_tracking_data.keys())
+        num_frames = len(self.video)
+
+        height, width = self.video.shape[1:3]
+        dot_size_as_fraction_of_min_edge = 0.015
+        radius = int(round(min(height, width) * dot_size_as_fraction_of_min_edge))
+        diam = radius * 2 + 1
+        quadratic_y = np.square(np.arange(diam)[:, np.newaxis] - radius - 1)
+        quadratic_x = np.square(np.arange(diam)[np.newaxis, :] - radius - 1)
+        icon = (quadratic_y + quadratic_x) - (radius ** 2) / 2.0
+        sharpness = 0.15
+        icon = np.clip(icon / (radius * 2 * sharpness), 0, 1)
+        icon = 1 - icon[:, :, np.newaxis]
+        icon1 = np.pad(icon, [(0, 1), (0, 1), (0, 0)])
+        icon2 = np.pad(icon, [(1, 0), (0, 1), (0, 0)])
+        icon3 = np.pad(icon, [(0, 1), (1, 0), (0, 0)])
+        icon4 = np.pad(icon, [(1, 0), (1, 0), (0, 0)])
+
+        video = self.video.copy()
+        for t in range(num_frames):
+            # Pad so that points that extend outside the image frame don't crash us
+            image = np.pad(
+                video[t],
+                [
+                    (radius + 1, radius + 1),
+                    (radius + 1, radius + 1),
+                    (0, 0),
+                ],
+            )
+            for i in self.arranged_tracking_data.keys():
+                # The icon is centered at the center of a pixel, but the input coordinates
+                # are raster coordinates.  Therefore, to render a point at (1,1) (which
+                # lies on the corner between four pixels), we need 1/4 of the icon placed
+                # centered on the 0'th row, 0'th column, etc.  We need to subtract
+                # 0.5 to make the fractional position come out right.
+                x = self.arranged_tracking_data[i][t]['x'] + 0.5
+                y = self.arranged_tracking_data[i][t]['y'] + 0.5
+                x = min(max(x, 0.0), width)
+                y = min(max(y, 0.0), height)
+
+                # if self.arranged_tracking_data[i][t]['visible']:
+                if True:
+                    x1, y1 = np.floor(x).astype(np.int32), np.floor(y).astype(np.int32)
+                    x2, y2 = x1 + 1, y1 + 1
+
+                    # bilinear interpolation
+                    patch = (
+                            icon1 * (x2 - x) * (y2 - y)
+                            + icon2 * (x2 - x) * (y - y1)
+                            + icon3 * (x - x1) * (y2 - y)
+                            + icon4 * (x - x1) * (y - y1)
+                    )
+                    x_ub = x1 + 2 * radius + 2
+                    y_ub = y1 + 2 * radius + 2
+                    image[y1:y_ub, x1:x_ub, :] = (1 - patch) * image[
+                                                               y1:y_ub, x1:x_ub, :
+                                                               ] + patch * np.array(self.colour_map[i])[np.newaxis,
+                                                                           np.newaxis,
+                                                                           :]
+
+                # Remove the pad
+                video[t] = image[
+                           radius + 1: -radius - 1, radius + 1: -radius - 1
+                           ].astype(np.uint8)
+
+        # Play the video
+        media.show_video(video, fps=self.video.metadata.fps)
+
     def add_keypoint_labels(self, frame_index, labels):
         self.keypoint_labels[frame_index] = labels
 
@@ -238,9 +348,10 @@ class VideoObject:
         video_frame = self.video[frame_index]
 
         point_labeler = PointLabeler()
-        point_labeler.label_points(video_frame, frame_index, task=task)
+        # point_labeler.label_points(video_frame, frame_index, task=task)
+        point_labeler.label_points_adaptive(self, task)
 
-        self.add_keypoint_labels(frame_index, point_labeler.selected_points)
+        self.add_keypoint_labels(point_labeler.select_frame, point_labeler.selected_points)
         self.labeling_task = task
 
     def _get_filename(self, format, tag=None):
@@ -253,6 +364,16 @@ class VideoObject:
     def _get_filename_with_tag_wildcard(self, format):
         # Return a string which can be used to glob files with the same video_id and task but different tags
         return f"{self.video_id}.{self.labeling_task}.*.{format}"
+
+    def keypoints_file_exists(self, output_dir, task='extreme_keypoints', file_type='json'):
+        file_types = ['csv', 'json']
+
+        if file_type not in file_types:
+            raise ValueError(f"Invalid file_type: {file_type}. Must be one of {file_types}")
+
+        self.labeling_task = task
+        file_path = os.path.join(output_dir, self._get_filename(file_type))
+        return os.path.exists(file_path)
 
     def save_keypoints_to_csv(self, output_dir, tag=None):
         with open(os.path.join(output_dir, self._get_filename('csv', tag)), 'w', newline='') as csvfile:
@@ -297,6 +418,13 @@ class VideoObject:
         filename = os.path.join(output_dir, self._get_filename('json', tag))
         with open(filename, 'w') as f:
             json.dump(keypoints_dict, f, indent=4)
+
+    def load_outlier_data_from_folder(self, outlier_data_folder):
+        file_path = os.path.join(outlier_data_folder, f'{self.video_id}_outliers.csv')
+
+        # If this file does not exist, that only means there is no outlier data for this video
+        if os.path.exists(file_path):
+            self.outlier_data = pd.read_csv(file_path)
 
     def load_keypoint_labels_from_folder(self, labeled_keypoints_folder, task='extreme_keypoints', file_type='json'):
         file_types = ['csv', 'json']
@@ -366,13 +494,15 @@ class VideoObject:
 
         return labeled_keypoint_sets
 
-    def merge_points(self, point_sets, frame_index, task='extreme_keypoints', auto_accept_single=False):
+    def merge_points(self, point_sets, labeled_frame_indices, task='extreme_keypoints', auto_accept_single=False):
         point_merger = PointMerger()
-        point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task, auto_accept_single)
-        self.add_keypoint_labels(frame_index, point_merger.selected_points)
+        for frame_index in labeled_frame_indices:
+            point_merger.merge_points(self.video[frame_index], frame_index, point_sets, task, auto_accept_single)
+            self.add_keypoint_labels(frame_index, point_merger.selected_points)
+
         self.labeling_task = task
 
-    def track_points(self, tracker, frame_index, task, labeled_keypoints_folder=None, file_type='json'):
+    def track_points(self, tracker, task, labeled_keypoints_folder=None, file_type='json'):
         """
         Track points in the video. The method identifies and
         tracks keypoints defined by the task in the given frame
@@ -380,7 +510,6 @@ class VideoObject:
 
         Args:
             tracker (PointTracker): The point tracking object.
-            frame_index (int): Index of the frame to start tracking.
             task (str): The task for which keypoints are to be tracked. Acceptable
                         values are 'extreme_keypoints' or 'all_body_keypoints'.
             labeled_keypoints_folder (str)
@@ -398,39 +527,82 @@ class VideoObject:
             raise ValueError(f"Invalid task: {task}. Must be one of {possible_tasks}")
 
         # Ensure keypoint labels are loaded for the frame_index
-        if frame_index not in self.keypoint_labels:
+        if self.keypoint_labels == {}:
             if labeled_keypoints_folder:
                 self.load_keypoint_labels_from_folder(labeled_keypoints_folder, task, file_type)
             else:
-                raise ValueError(f"Keypoint labels for frame {frame_index} are not already loaded, "
+                raise ValueError(f"Keypoint labels are not already loaded, "
                                  f"please provide labelled keypoint folder.")
 
-        # Check if keypoint labels were successfully loaded
-        if frame_index not in self.keypoint_labels:
-            raise ValueError(f"Keypoint labels for frame {frame_index} could not be loaded.")
+        # Get ascending set of frame indices in the keypoint labels
+        frame_indices = sorted(self.keypoint_labels.keys())
 
-        labelled_keypoints = self.get_keypoint_labels(frame_index, task)
+        # Determine absolute frame intervals between the labeled keyframe indices
+        # Use a tuple (start_frame_index, end_frame_index, track_backward) to represent each interval
+        if len(frame_indices) > 1:
+            frame_intervals = [(frame_indices[i], frame_indices[i + 1], False) for i in range(len(frame_indices) - 1)]
+            frame_intervals.append((frame_indices[-1], len(self.video), False))
 
-        # labelled_keypoints is a dictionary with keypoint names as key
-        tracks, visibles = tracker.track_selected_points(self.video, frame_index, labelled_keypoints)
+        else:
+            frame_intervals = [(frame_indices[0], len(self.video), False)]
 
-        # Initialize an empty dictionary to store the results as a dictionary, where each value is a list of
-        # dictionaries with coordinates x, y and whether the point is visible at this time frame
-        # Format: {'keypoint': [{'x': x_coord, 'y': y_coord, 'visible': Array(True, dtype=bool)}, ...], ...}
-        tracking_results = {}
+        # Check the first frame index, if it is > 0 then insert a new interval from 0 to the first frame index ahead
+        # So far, this is also the only interval that should be tracked backwards
+        if frame_indices[0] > 0:
+            frame_intervals.insert(0, (0, frame_indices[0], True))
 
-        # Retrieve the task keypoints for the names
-        task_keypoints = self.get_keypoint_labels(frame_index, task).keys()
+        # If there are multiple labeled frame indices, the first labeled frame is 0, and the second frame has more
+        # labeled points, then add an interval tracking these extra points backward to frame 0
+        if len(frame_indices) > 1 and len(self.keypoint_labels[frame_indices[1]]) > len(self.keypoint_labels[frame_indices[0]]):
+            frame_intervals.append((0, frame_indices[1], True))
 
-        # Loop over each keypoint index and name
-        for i, keypoint in enumerate(task_keypoints):
-            tracking_results[keypoint] = []
-            for frame in range(tracks.shape[1]):
-                coord = tracks[i, frame]
-                visible = visibles[i, frame]
-                tracking_results[keypoint].append({"x": coord[0], "y": coord[1], "visible": bool(visible)})
+        for interval in frame_intervals:
+            start_frame_index, end_frame_index, track_backward = interval
 
-        self.tracking_data[frame_index] = tracking_results
+            if track_backward:
+                keypoint_labels_frame = end_frame_index
+            else:
+                keypoint_labels_frame = start_frame_index
+
+            labelled_keypoints = self.get_keypoint_labels(keypoint_labels_frame, task)
+
+            # If tracking backwards, and the set of keys for start and end frames both exist but are different, then
+            # only track the keys in the difference
+            if track_backward:
+                labelled_keypoints_start = self.get_keypoint_labels(start_frame_index, task)
+                labelled_keypoints_end = self.get_keypoint_labels(end_frame_index, task)
+                labelled_keypoints = {k: v for k, v in labelled_keypoints_end.items() if k not in labelled_keypoints_start}
+
+            # labelled_keypoints is a dictionary with keypoint names as key
+            tracks, visibles = tracker.track_selected_points(self.video, start_frame_index, end_frame_index,
+                                                             labelled_keypoints, track_backward)
+
+            # Initialize an empty dictionary to store the results as a dictionary, where each value is a list of
+            # dictionaries with coordinates x, y and whether the point is visible at this time frame
+            # Format: {'keypoint': [{'x': x_coord, 'y': y_coord, 'visible': Array(True, dtype=bool)}, ...], ...}
+            tracking_results = {}
+
+            # Retrieve the task keypoints for the names
+            task_keypoints = labelled_keypoints.keys()
+
+            # Loop over each keypoint index and name
+            for i, keypoint in enumerate(task_keypoints):
+                tracking_results[keypoint] = []
+                for frame in range(tracks.shape[1]):
+                    coord = tracks[i, frame]
+                    visible = visibles[i, frame]
+                    tracking_results[keypoint].append({"x": coord[0], "y": coord[1], "visible": bool(visible)})
+
+            self._merge_tracking_data(keypoint_labels_frame, tracking_results)
+
+    def _merge_tracking_data(self, frame_index, tracking_results):
+        if frame_index not in self.tracking_data.keys():
+            self.tracking_data[frame_index] = tracking_results
+
+        else:
+            # Merge in the new tracking results
+            for keypoint, data_list in tracking_results.items():
+                self.tracking_data[frame_index][keypoint] += data_list
 
     def save_tracked_points_to_csv(self, folder):
         filename = os.path.join(folder, f'tracked_points_{self.video_id}.csv')
@@ -440,17 +612,20 @@ class VideoObject:
             writer.writerow(['tracked_from_frame', 'keypoint', 'frame_index', 'x', 'y', 'visible'])
 
             # Iterate through the tracking data and write each point
+            written_frame_counts = {}  # Track how many frames are written per keypoint
+
             for frame_index, tracking_result in self.tracking_data.items():
                 for keypoint, data_list in tracking_result.items():
                     for frame, data in enumerate(data_list):
                         writer.writerow([
                             frame_index,
                             keypoint,
-                            frame,
+                            written_frame_counts.get(keypoint, 0),
                             data['x'],
                             data['y'],
                             data['visible']
-                        ])
+                        ]   )
+                        written_frame_counts[keypoint] = written_frame_counts.get(keypoint, 0) + 1
         print('tracking_data saved to', filename)
 
     def save_tracked_points_to_json(self, folder):
@@ -482,6 +657,11 @@ class VideoObject:
         elif file_type == 'csv':
             self._load_tracked_points_from_csv(file_path)
 
+        self.update_arranged_tracked_data()
+
+    def update_arranged_tracked_data(self):
+        self.arranged_tracking_data = self.get_arranged_tracking_data()
+
     def _load_tracked_points_from_csv(self, csv_file_path):
 
         # Initialize a nested dictionary
@@ -506,6 +686,9 @@ class VideoObject:
                 })
 
         self.tracking_data = {k: dict(v) for k, v in tracking_results.items()}
+
+    def get_tracked_points(self):
+        pass
 
     def update_extreme_coordinates(self, tracked_keypoints_folder=None, file_type='json'):
         """
@@ -577,7 +760,7 @@ class VideoObject:
         }
 
         # -- Save the keypoints in the cropped video coords to a file
-        output_dir = './output/labeled' #TODO: think about a more flexible way to do that
+        output_dir = './output/labeled'  # TODO: think about a more flexible way to do that
         tag = 'cropped'
         filename = os.path.join(output_dir, self._get_filename('json', tag))
 
@@ -629,18 +812,75 @@ class VideoObject:
         if load_and_release_video:
             self.release_video()
 
-    def get_tracked_points_deltas(self, frame_index):
-        # Return the difference between successive frames for each tracked point based on the frame_index
-        assert frame_index in self.tracking_data, f"No tracked points found for frame {frame_index}"
+    def get_tracked_points_deltas(self):
+        # Get video dimensions to make deltas relative
+        if self.video is None:
+            self.load_video()
 
-        frame_deltas = { keypoint: [] for keypoint in self.tracking_data[frame_index] }
-        for keypoint, data_list in self.tracking_data[frame_index].items():
+        width, height = self.video.shape[2], self.video.shape[1]
+
+        self.release_video()
+
+        # Return the difference between successive frames for each tracked point
+        frame_deltas = {keypoint: [] for keypoint in self.arranged_tracking_data}
+        for keypoint, data_list in self.arranged_tracking_data.items():
             for i, data in enumerate(data_list[:-1]):
-                x_diff = abs(data['x'] - data_list[i+1]['x'])
-                y_diff = abs(data['y'] - data_list[i+1]['y'])
+                x_diff = abs(data['x'] - data_list[i + 1]['x']) / width
+                y_diff = abs(data['y'] - data_list[i + 1]['y']) / height
                 frame_deltas[keypoint].append((x_diff, y_diff))
 
         return frame_deltas
+
+    def get_arranged_tracking_data(self):
+        assert self.tracking_data is not {}, f"No tracked points found"
+        # arranged_tracking_data = {keypoint: [] for keypoint in self.tracking_data[list(self.tracking_data.keys())[0]]}
+        arranged_tracking_data = {}
+
+        for frame_index, data in self.tracking_data.items():
+            for keypoint, data_list in data.items():
+                if keypoint not in arranged_tracking_data:
+                    arranged_tracking_data[keypoint] = []
+
+                arranged_tracking_data[keypoint] += [
+                    {'x': data_elem['x'], 'y': data_elem['y'], 'visible': data_elem['visible']} for data_elem
+                    in data_list]
+
+        return arranged_tracking_data
+
+    def impute_value(self, keypoint, frame_index):
+        assert frame_index != 0 and frame_index != len(self.video) - 1, "Cannot impute value for first or last frame"
+        x_0, y_0 = self.arranged_tracking_data[keypoint][frame_index - 1]['x'], self.arranged_tracking_data[keypoint][frame_index - 1]['y']
+        x_2, y_2 = self.arranged_tracking_data[keypoint][frame_index + 1]['x'], self.arranged_tracking_data[keypoint][frame_index + 1]['y']
+        return np.mean([x_0, x_2]), np.mean([y_0, y_2])
+
+    def get_tracking_data_position(self, frame_index):
+        keyframes = sorted(list(self.tracking_data.keys()))
+        keyframes.append(len(self.video))
+
+        for i in range(len(keyframes) - 1):
+            if keyframes[i] <= frame_index < keyframes[i + 1]:
+                return keyframes[i], frame_index - keyframes[i]
+
+
+    def get_sorted_outlier_table(self):
+        return self.outlier_data.sort_values(by=['Keypoint', 'Outlier frame index'])
+
+    def get_one_off_outliers(self, diff=1):
+        outlier_table = self.get_sorted_outlier_table()
+        outlier_table['diff'] = outlier_table['Outlier frame index'].diff(-1) * -1
+        outlier_table['next_type'] = outlier_table['Outlier Type'].shift(-1)
+        outlier_table['next_keypoint'] = outlier_table['Keypoint'].shift(-1)
+        one_offs = outlier_table[(outlier_table['diff'] == diff) & (outlier_table['Outlier Type'] == 1) & (outlier_table['next_type'] == 3) & (outlier_table['Keypoint'] == outlier_table['next_keypoint'])]
+        return one_offs
+
+    def get_point_set_for_outlier(self, outlier_frame_index):
+        # Load all points at the provided outlier frame index
+        point_set = {}
+
+        for kp, tracked_list in self.arranged_tracking_data.items():
+            point_set[kp] = np.array([tracked_list[outlier_frame_index]['x'], tracked_list[outlier_frame_index]['y']])
+
+        return point_set
 
 
 #################################################

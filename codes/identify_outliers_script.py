@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import pickle
 import numpy as np
 from tqdm import tqdm
 
@@ -24,91 +25,116 @@ parser.add_argument("--save_figures", action="store_true", default=False, help="
 parser.add_argument('--tracked_kp_path', default='./output/tracked',
                     help='Path to tracked keypoints')
 parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
+parser.add_argument('--video_path',
+                    default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    help='Path to directory containing videos.')
 
 args = parser.parse_args()
 
-video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
+video_folder = args.video_path
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
 video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
 video_ids = video_manager.get_all_video_ids()
 
-print("Gathering video statistics...")
-frame_index = 0  # Use this later when we have more index frames
-keypoint_frame_deltas = {}
+# Check if distribution of point movement is saved
+if os.path.exists("./keypoint_distributions.pkl"):
+    print("Loading existing distribution data")
+    with open("./keypoint_distributions.pkl", "rb") as f:
+        keypoint_distributions = pickle.load(f)
 
-for video_id in video_ids:
-    video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas(frame_index)
+else:
+    print("Gathering video statistics...")
+    keypoint_frame_deltas = {}
 
-    for keypoint, deltas in video_frame_deltas.items():
-        if keypoint not in keypoint_frame_deltas:
-            keypoint_frame_deltas[keypoint] = []
-        keypoint_frame_deltas[keypoint] += deltas
+    for video_id in video_ids:
+        video_frame_deltas = video_manager.get_video_object(video_id).get_tracked_points_deltas()
 
-# Calculate distribution of point movement
-keypoint_distributions = {}
+        for keypoint, deltas in video_frame_deltas.items():
+            if keypoint not in keypoint_frame_deltas:
+                keypoint_frame_deltas[keypoint] = []
+            keypoint_frame_deltas[keypoint] += deltas
 
-for keypoint, deltas in keypoint_frame_deltas.items():
-    # Process x and y coordinates of each keypoint
-    x_deltas = [delta[0] for delta in deltas]
-    y_deltas = [delta[1] for delta in deltas]
+    # Calculate distribution of point movement
+    keypoint_distributions = {}
 
-    # Calculate the mean and standard deviation of the x and y deltas
-    x_mean = np.mean(x_deltas)
-    x_std = np.std(x_deltas)
-    y_mean = np.mean(y_deltas)
-    y_std = np.std(y_deltas)
-
-    # Save the results
-    keypoint_distributions[keypoint] = {
-        "x_mean": x_mean,
-        "x_std": x_std,
-        "y_mean": y_mean,
-        "y_std": y_std
-    }
-
-    # Print the results
-    print(f"Key point: {keypoint}")
-    print(f"X mean: {x_mean}, X std: {x_std}")
-    print(f"Y mean: {y_mean}, Y std: {y_std}")
-    print("")
-
-# Count the number of frames where the point moved more than the threshold * stddev from the mean
-outliers = {}
-outlier_count = 0
-
-for video_id in video_ids:
-    video_object = video_manager.get_video_object(video_id)
-    video_frame_deltas = video_object.get_tracked_points_deltas(frame_index)
-    outliers[video_id] = {}
-    outliers[video_id][frame_index] = {}
-
-    for keypoint, deltas in video_frame_deltas.items():
+    for keypoint, deltas in keypoint_frame_deltas.items():
+        # Process x and y coordinates of each keypoint
         x_deltas = [delta[0] for delta in deltas]
         y_deltas = [delta[1] for delta in deltas]
 
-        x_mean = keypoint_distributions[keypoint]["x_mean"]
-        x_std = keypoint_distributions[keypoint]["x_std"]
-        y_mean = keypoint_distributions[keypoint]["y_mean"]
-        y_std = keypoint_distributions[keypoint]["y_std"]
+        # Calculate the mean and standard deviation of the x and y deltas
+        x_mean = np.mean(x_deltas)
+        x_std = np.std(x_deltas)
+        y_mean = np.mean(y_deltas)
+        y_std = np.std(y_deltas)
 
-        x_diffs = np.abs(x_deltas - x_mean)
-        y_diffs = np.abs(y_deltas - y_mean)
-        x_outliers = np.where(x_diffs > args.stddev_threshold * x_std)[0]
-        y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
+        # Save the results
+        keypoint_distributions[keypoint] = {
+            "x_mean": x_mean,
+            "x_std": x_std,
+            "y_mean": y_mean,
+            "y_std": y_std
+        }
 
-        outlier_set = set(x_outliers).union(set(y_outliers))
+        # Print the results
+        print(f"Key point: {keypoint}")
+        print(f"X mean: {x_mean}, X std: {x_std}")
+        print(f"Y mean: {y_mean}, Y std: {y_std}")
+        print("")
 
-        if len(outlier_set) > 0:
-            outliers[video_id][frame_index][keypoint] = [
-                (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
-                 y_diffs[i] / y_std) for i in
-                outlier_set]
-            outlier_count += len(outlier_set)
+    # Save the keypoint_distributions
+    with open("./keypoint_distributions.pkl", "wb") as f:
+        pickle.dump(keypoint_distributions, f)
 
-    if len(outliers[video_id][frame_index]) == 0:
-        outliers.pop(video_id)
+
+# Count the number of frames where the point moved more than the threshold * stddev from the mean
+if os.path.exists("./output/outliers/outliers.pkl"):
+    print("Loading existing outlier data")
+    with open("./output/outliers/outliers.pkl", "rb") as f:
+        outliers = pickle.load(f)
+        outlier_counts = [[len(x) for x in list(outliers[video_id].values())] for video_id in outliers]
+        outlier_count = sum([sum(x) for x in outlier_counts])
+
+else:
+    outliers = {}
+    outlier_count = 0
+
+    for video_id in video_ids:
+        video_object = video_manager.get_video_object(video_id)
+        video_frame_deltas = video_object.get_tracked_points_deltas()
+        outliers[video_id] = {}
+
+        for keypoint, deltas in video_frame_deltas.items():
+            x_deltas = [delta[0] for delta in deltas]
+            y_deltas = [delta[1] for delta in deltas]
+
+            x_mean = keypoint_distributions[keypoint]["x_mean"]
+            x_std = keypoint_distributions[keypoint]["x_std"]
+            y_mean = keypoint_distributions[keypoint]["y_mean"]
+            y_std = keypoint_distributions[keypoint]["y_std"]
+
+            x_diffs = np.abs(x_deltas - x_mean)
+            y_diffs = np.abs(y_deltas - y_mean)
+            x_outliers = np.where(x_diffs > args.stddev_threshold * x_std)[0]
+            y_outliers = np.where(y_diffs > args.stddev_threshold * y_std)[0]
+
+            outlier_set = set(x_outliers).union(set(y_outliers))
+
+            if len(outlier_set) > 0:
+                outliers[video_id][keypoint] = [
+                    (i, x_diffs[i], x_diffs[i] / x_std, y_diffs[i],
+                     y_diffs[i] / y_std) for i in
+                    outlier_set]
+                outlier_count += len(outlier_set)
+
+        if len(outliers[video_id]) == 0:
+            outliers.pop(video_id)
+
+    # Save outliers
+    with open(f"./output/outliers/outliers.pkl", "wb") as f:
+        pickle.dump(outliers, f)
 
 print(f"Found {outlier_count} outliers")
 
@@ -119,11 +145,10 @@ if args.show_outliers and len(outliers) > 0:
 
         od = OutlierDisplay(video_object, save_figures=args.save_figures, stddev_threshold=args.stddev_threshold)
 
-        for frame_index in outliers[video_id]:
-            for keypoint, outlier_frame_info in outliers[video_id][frame_index].items():
-                for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
-                    od.show_outlier(keypoint, frame_index, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
-                    pbar.update(1)
+        for keypoint, outlier_frame_info in outliers[video_id].items():
+            for outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul in outlier_frame_info:
+                od.show_outlier(keypoint, outlier_frame, x_diff, x_stddev_mul, y_diff, y_stddev_mul)
+                pbar.update(1)
 
         od.write_outliers_to_file()
         video_object.release_video()

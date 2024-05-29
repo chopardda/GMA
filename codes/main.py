@@ -1,5 +1,3 @@
-CUDA_VISIBLE_DEVICES = 0  # TODO: use GPU
-
 import os
 import sys
 import argparse
@@ -13,10 +11,10 @@ from point_tracker import PointTracker
 from video_manager import VideoManager
 
 
-# TODO: all paths or as arguments!
-
 def main():
     parser = argparse.ArgumentParser(description='Process videos.')
+    parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'], required=True,
+                        help='Task for labeling keypoints.')
     parser.add_argument('--track_only', action='store_true',
                         help='Track keypoints only')
     parser.add_argument('--crop_resize_only', action='store_true',
@@ -34,6 +32,8 @@ def main():
                         help='Path to output directory to save cropped and resized videos.')
     parser.add_argument('--frame_limit', default='auto',
                         help='Limit the number of frames to process on GPU per batch (default: auto)')
+    parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
+    parser.add_argument('--specific_video', default=None, help='Process a specific video (e.g. cropped_vid_01_PR_c')
 
     args = parser.parse_args()
 
@@ -60,19 +60,18 @@ def main():
     tracker = PointTracker('../tapnet/checkpoints/tapir_checkpoint_panning.npy', args.frame_limit)
 
     video_ids = video_manager.get_all_video_ids()
-    # video_ids = ['18_FN_c', '07_F-_c']
+    # video_ids = ['cropped_vid_07_PR_c', 'cropped_vid_01_PR_c']
 
     # --- Track extreme coordinates for cropping
     if not args.crop_resize_only:
         for video_id in video_ids:
+            if args.specific_video is not None and args.specific_video != video_id:
+                continue
+
             # print(f"\n{'=' * 60}")
             print(f"Keypoint tracking for video {video_id}...")
             # print(f"{'=' * 60}\n")
             video_object = video_manager.get_video_object(video_id)
-
-            # Define starting frame and tracking task (which keypoints to track)
-            frame_index = 0
-            task = 'extreme_keypoints'
 
             # Load video
             video_object.load_video()
@@ -81,13 +80,18 @@ def main():
             try:
                 video_object.track_points(
                     tracker,
-                    frame_index,
-                    task,
+                    args.task,
                     labeled_keypoints_folder,
                     'json'
                 )
             except ValueError as e:
                 print(e)  # Handle the error appropriately
+
+            except FileNotFoundError as fe:
+                if args.missing_ok:
+                    continue
+                else:
+                    raise fe
 
             # Save tracked points
             video_object.save_tracked_points_to_csv(tracked_keypoints_folder)
@@ -98,6 +102,9 @@ def main():
     # --- Crop videos according to tracked points
     if not args.track_only:
         for video_id in video_ids:
+            if args.specific_video is not None and args.specific_video != video_id:
+                continue
+
             print(f"Cropping and resizing video {video_id}...")
             video_object = video_manager.get_video_object(video_id)
 
