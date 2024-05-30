@@ -84,6 +84,7 @@ for video_id in tqdm(video_ids):
 
             video_object.add_keypoint_labels(outlier_frame_index, relabeler.selected_points)
             pbar.update(1)
+            manual_correction_done = True
 
         pbar.close()
 
