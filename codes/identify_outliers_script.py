@@ -94,9 +94,10 @@ else:
 
 
 # Count the number of frames where the point moved more than the threshold * stddev from the mean
-if os.path.exists("./output/outliers/outliers.pkl"):
+outlier_file = f"./output/outliers/outliers_{args.stddev_threshold}.pkl"
+if os.path.exists(outlier_file):
     print("Loading existing outlier data")
-    with open("./output/outliers/outliers.pkl", "rb") as f:
+    with open(outlier_file, "rb") as f:
         outliers = pickle.load(f)
         outlier_counts = [[len(x) for x in list(outliers[video_id].values())] for video_id in outliers]
         outlier_count = sum([sum(x) for x in outlier_counts])
@@ -137,7 +138,7 @@ else:
             outliers.pop(video_id)
 
     # Save outliers
-    with open(f"./output/outliers/outliers.pkl", "wb") as f:
+    with open(outlier_file, "wb") as f:
         pickle.dump(outliers, f)
 
 print(f"Found {outlier_count} outliers")
