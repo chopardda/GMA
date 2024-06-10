@@ -38,6 +38,8 @@ video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.miss
 video_manager.load_all_outlier_data(args.outlier_dir)
 video_ids = video_manager.get_all_video_ids()
 
+manual_correction_done = False
+
 for video_id in tqdm(video_ids):
     video_object = video_manager.get_video_object(video_id)
 
@@ -82,6 +84,7 @@ for video_id in tqdm(video_ids):
 
             video_object.add_keypoint_labels(outlier_frame_index, relabeler.selected_points)
             pbar.update(1)
+            manual_correction_done = True
 
         pbar.close()
 
@@ -91,6 +94,12 @@ for video_id in tqdm(video_ids):
 
         # Save updated tracking data
         video_object.save_tracked_points_to_csv(args.tracked_kp_path)
-        video_object.save_tracked_points_to_json(args.tracked_kp_path)
+        # video_object.save_tracked_points_to_json(args.tracked_kp_path)
 
         video_object.release_video()
+
+if not manual_correction_done:
+    print("No manual corrections were made, outliers have all been corrected")
+
+else:
+    print("Manual corrections have been made, please rerun the tracking script with the new labeled frames and check for outliers again")

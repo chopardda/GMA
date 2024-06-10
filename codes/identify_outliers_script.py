@@ -33,9 +33,13 @@ args = parser.parse_args()
 
 video_folder = args.video_path
 
+# Ensure outliers directory exists
+if not os.path.exists("./output/outliers"):
+    os.makedirs("./output/outliers")
+
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves
-video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok)
+video_manager.load_all_tracked_points(args.tracked_kp_path, missing_ok=args.missing_ok, file_type='csv')
 video_ids = video_manager.get_all_video_ids()
 
 # Check if distribution of point movement is saved
@@ -90,9 +94,10 @@ else:
 
 
 # Count the number of frames where the point moved more than the threshold * stddev from the mean
-if os.path.exists("./output/outliers/outliers.pkl"):
+outlier_file = f"./output/outliers/outliers_{args.stddev_threshold}.pkl"
+if os.path.exists(outlier_file):
     print("Loading existing outlier data")
-    with open("./output/outliers/outliers.pkl", "rb") as f:
+    with open(outlier_file, "rb") as f:
         outliers = pickle.load(f)
         outlier_counts = [[len(x) for x in list(outliers[video_id].values())] for video_id in outliers]
         outlier_count = sum([sum(x) for x in outlier_counts])
@@ -133,7 +138,7 @@ else:
             outliers.pop(video_id)
 
     # Save outliers
-    with open(f"./output/outliers/outliers.pkl", "wb") as f:
+    with open(outlier_file, "wb") as f:
         pickle.dump(outliers, f)
 
 print(f"Found {outlier_count} outliers")
