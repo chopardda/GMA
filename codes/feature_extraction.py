@@ -183,8 +183,19 @@ def sweep_function():
     # train_model(model, train_loader, test_loader, epochs=100)
 
     if args.wandb:
-        config_dict = {"epochs": wandb.config.epochs, "batch_size": wandb.config.batch_size, "seed": args.seed, "type_a": args.type_a,
-                       "model": model.__class__.__name__, "feature_type": dataset.feature_type}
+        config_dict = {"seed": args.seed, "type_a": args.type_a, "model": model.__class__.__name__, "feature_type": dataset.feature_type}
+
+        if args.model == "CNN" or args.model == "LSTM":
+            config_dict['epochs'] = wandb.config.epochs
+            config_dict['batch_size'] = wandb.config.batch_size
+            config_dict['learning_rate'] = wandb.config.learning_rate
+
+            if args.model == "CNN":
+                config_dict['out_features'] = wandb.config.out_features
+
+            else:
+                config_dict['hidden_size'] = wandb.config.hidden_size
+                config_dict['num_layers'] = wandb.config.num_layers
 
         if args.num_outlier_passes >= 0:
             config_dict["num_outlier_passes"] = args.num_outlier_passes
