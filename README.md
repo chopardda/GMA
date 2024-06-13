@@ -41,7 +41,7 @@ python codes/process_and_label_videos_script.py --task all_body_keypoints --vide
 ```
 
 ## Outlier detection and removal loop
-Removing outliers is an iterative process involving the `identify_outliers_script.py` and 'fix_outliers_script.py` scripts. The `identify_outliers_script.py` script helps you to identify the types of outliers in the tracked data, while the `fix_outliers_script.py` script tries to automatically fix as much as it can, and then allows you to relabel the detected outliers. Then, the tracking process is re-run with the supplemented labeled points set. The process is ideally repeated until no more outliers are detected.
+Removing outliers is an iterative process involving the `identify_outliers_script.py` and `fix_outliers_script.py` scripts. The `identify_outliers_script.py` script helps you to identify the types of outliers in the tracked data, while the `fix_outliers_script.py` script tries to automatically fix as much as it can, and then allows you to relabel the detected outliers. Then, the tracking process is re-run with the supplemented labeled points set. The process is ideally repeated until no more outliers are detected.
 
 ### Process
 1. Run the `identify_outliers_script.py` script to identify outliers in the tracked data with the following arguments:
