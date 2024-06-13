@@ -40,3 +40,40 @@ To run the script with custom paths for the task `all_body_keypoints` and both t
 python codes/process_and_label_videos_script.py --task all_body_keypoints --video_path /path/to/your/videos --output_path /path/to/save/labels
 ```
 
+## Outlier detection and removal loop
+Removing outliers is an iterative process involving the `identify_outliers_script.py` and 'fix_outliers_script.py` scripts. The `identify_outliers_script.py` script helps you to identify the types of outliers in the tracked data, while the `fix_outliers_script.py` script tries to automatically fix as much as it can, and then allows you to relabel the detected outliers. Then, the tracking process is re-run with the supplemented labeled points set. The process is ideally repeated until no more outliers are detected.
+
+### Process
+1. Run the `identify_outliers_script.py` script to identify outliers in the tracked data with the following arguments:
+`
+--show_outliers
+--tracked_kp_path /path/to/tracked/keypoint_files
+--missing_ok 
+--video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos 
+--stddev_threshold 20
+`
+When presented with a potential outlier, use the following keys to label it:
+```
+escape: Not an outlier
+1: Outlier, moving from correct position to incorrect position
+2. Outlier, moving from incorrect position to incorrect position
+3. Outlier, moving from incorrect position to correct position
+```
+
+2. Run the `fix_outliers_script.py` script with the following arguments:
+`
+--task all_body_keypoints
+--tracked_kp_path /path/to/tracked/keypoint_files
+--labeled_kp_path /path/to/labeled/keypoint_files
+--missing_ok 
+--video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos 
+--output_path ./output/relabeled
+`
+For each frame that pops up, relabel the outlier point, as well as any other incorrect points as needed. To do this, click on the point to be relabeled, and then click on the correct point in the video. Press enter when finished with that frame.
+
+3. Rerun the tracking process, using the relabled data as labeled input. e.g.:
+`
+python main.py --task all_body_keypoints --video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos  --labeled_kp_path ./output/relabeled --tracked_kp_path ./output/tracked_relabeled --missing_ok --track_only
+`
+4. Rerun steps 1-3, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on
+5. After you are satisfied, the final tracked keypoints located at the path provided to the `--tracked_kp_path` flag in the last iteration can be used for further analysis.
