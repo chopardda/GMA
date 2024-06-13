@@ -247,7 +247,17 @@ class VideoObject:
                 # Handle specific exceptions related to loading failures
                 raise NoVideoLoadedError("Video not loaded and automatic video loading failed. Error: " + str(e))
 
+    def save_video_with_tracks(self, output_dir):
+        video = self.get_video_with_tracks()
+        media.write_video(os.path.join(output_dir, f"{self.video_id}.mp4"), video)
+
     def show_video_with_tracks(self):
+        video = self.get_video_with_tracks()
+
+        # Play the video
+        media.show_video(video, fps=self.video.metadata.fps)
+
+    def get_video_with_tracks(self):
         assert self.arranged_tracking_data is not {}, "No tracking data available for this video."
 
         # Ensure video is loaded
@@ -318,8 +328,7 @@ class VideoObject:
                            radius + 1: -radius - 1, radius + 1: -radius - 1
                            ].astype(np.uint8)
 
-        # Play the video
-        media.show_video(video, fps=self.video.metadata.fps)
+        return video
 
     def add_keypoint_labels(self, frame_index, labels):
         self.keypoint_labels[frame_index] = labels
