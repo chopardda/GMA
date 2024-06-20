@@ -1,4 +1,4 @@
-## Set up environment
+**## Set up environment
 Setting up jax to work with GPU is a bit tricky:
 1. Create conda environment: `conda env create -f environment.yml`
 2. Install jax with GPU support: `pip install --upgrade pip`, `pip install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html`
@@ -78,3 +78,21 @@ python main.py --task all_body_keypoints --video_path /cluster/work/vogtlab/Proj
 `
 5. Rerun steps 1-4, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on
 6. After you are satisfied, the final tracked keypoints located at the path provided to the `--tracked_kp_path` flag in the last iteration can be used for further analysis.
+
+
+## Classification problem from tracked keypoints
+
+Computing the label prediction for the classification problem in the tracked videos. Using the coordinates of the keypoints and cross validation. Execute the following command:
+
+`
+python feature_extraction.py 
+`
+
+You can modify the parameters for the training with the following flags:
+- `--seed`: Random seed
+- `--epochs`: Number of epochs
+- `--folds`: Number of folds for cross validation
+- `--batch_size`: Batch size
+- `--type_a`: Type of classification problem between the early and late videos. Options: `early` or `late`
+- `--directory`: Path to the tracked keypoints
+- `--model`: Model architecture to use for training
