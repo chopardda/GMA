@@ -70,10 +70,11 @@ escape: Not an outlier
 --output_path ./output/relabeled
 `
 For each frame that pops up, relabel the outlier point, as well as any other incorrect points as needed. To do this, click on the point to be relabeled, and then click on the correct point in the video. Press enter when finished with that frame.
+3. Delete the `./output/outliers` directory and the `./keypoints_distributgions.pkl` file
 
-3. Rerun the tracking process, using the relabled data as labeled input. e.g.:
+4. Rerun the tracking process, using the relabled data as labeled input. e.g.:
 `
 python main.py --task all_body_keypoints --video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos  --labeled_kp_path ./output/relabeled --tracked_kp_path ./output/tracked_relabeled --missing_ok --track_only
 `
-4. Rerun steps 1-3, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on
-5. After you are satisfied, the final tracked keypoints located at the path provided to the `--tracked_kp_path` flag in the last iteration can be used for further analysis.
+5. Rerun steps 1-4, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on
+6. After you are satisfied, the final tracked keypoints located at the path provided to the `--tracked_kp_path` flag in the last iteration can be used for further analysis.
