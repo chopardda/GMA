@@ -23,6 +23,7 @@ parser.add_argument('--output_path', default='./output/relabeled',
                     help='Path to output directory for saving labelled data files.')
 parser.add_argument('--video_path', default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
                     help='Path to folder containing videos.')
+parser.add_argument('--auto_only', default=False, action="store_true", help="Only correct auto-detected outliers")
 
 args = parser.parse_args()
 
@@ -72,6 +73,9 @@ for video_id in tqdm(video_ids):
 
         pbar = tqdm(total=len(outliers))
         for idx, outlier in outliers.iterrows():
+            if args.auto_only:
+                continue
+
             outlier_frame_index = outlier['Outlier frame index'] + 1
 
             if outlier['Outlier Type'] in [0, 3] or outlier['Outlier frame index'] + 1 in labelled_frames:
