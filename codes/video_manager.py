@@ -875,8 +875,13 @@ class VideoObject:
         x_2, y_2 = self.arranged_tracking_data[keypoint][frame_index + 1]['x'], self.arranged_tracking_data[keypoint][frame_index + 1]['y']
         return np.mean([x_0, x_2]), np.mean([y_0, y_2])
 
-    def get_tracking_data_position(self, frame_index):
+    def get_tracking_data_position(self, frame_index, keypoint):
         keyframes = sorted(list(self.tracking_data.keys()))
+
+        # Filter out keyframes where the provided keypoint is not labeled
+        keyframes = list(filter(lambda x: keypoint in self.tracking_data[x].keys(), keyframes))
+
+        # Add last frame
         keyframes.append(len(self.video))
 
         for i in range(len(keyframes) - 1):

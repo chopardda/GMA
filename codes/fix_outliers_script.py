@@ -60,7 +60,7 @@ for video_id in tqdm(video_ids):
             outlier_frame_index = outlier['Outlier frame index'] + 1
             outlier_keypoint = outlier['Keypoint']
             imp_x, imp_y = video_object.impute_value(outlier_keypoint, outlier_frame_index)
-            adj_idx, adj_frame_idx = video_object.get_tracking_data_position(outlier_frame_index)
+            adj_idx, adj_frame_idx = video_object.get_tracking_data_position(outlier_frame_index, outlier_keypoint)
             video_object.tracking_data[adj_idx][outlier_keypoint][adj_frame_idx]['x'] = imp_x
             video_object.tracking_data[adj_idx][outlier_keypoint][adj_frame_idx]['y'] = imp_y
             video_object.update_arranged_tracked_data()
