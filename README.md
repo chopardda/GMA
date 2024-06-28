@@ -96,3 +96,5 @@ You can modify the parameters for the training with the following flags:
 - `--type_a`: Type of classification problem between the early and late videos. Options: `early` or `late`
 - `--directory`: Path to the tracked keypoints
 - `--model`: Model architecture to use for training
+- `--wandb`: Save logs to cluster local WandB instance. It must be set up correctly
+- `--num_iterations`: Number of full cross validation iterations to run
