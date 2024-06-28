@@ -2,13 +2,15 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score,  accuracy_score
+from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score, accuracy_score, confusion_matrix
 from sklearn.model_selection import KFold
 import pandas as pd
 from collections import defaultdict
 import numpy as np
 import torch
 import os
+import wandb
+
 
 def set_seeds(seed=42):
     # Set seeds for reproducibility
@@ -19,6 +21,7 @@ def set_seeds(seed=42):
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
 
 def create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=16):
     train_dataset = Subset(dataset, train_indices)
@@ -131,7 +134,9 @@ class CustomDataset(Dataset):
         label = self.labels[idx]
         return torch.tensor(feature, dtype=torch.float32), label
 
-def train_model(model, train_loader, test_loader, epochs=10):
+
+def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fold=None):
+    run_name = "" if fold is None else f"Fold_{fold + 1}"
     criterion = nn.BCELoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.00001)
 
@@ -139,6 +144,10 @@ def train_model(model, train_loader, test_loader, epochs=10):
         model.train()
         running_loss = 0.0
         for inputs, labels in train_loader:
+            if torch.cuda.is_available():
+                inputs = inputs.to("cuda:0")
+                labels = labels.to("cuda:0")
+
             optimizer.zero_grad()
             outputs = model(inputs).squeeze()
             loss = criterion(outputs, labels.squeeze().float())
@@ -146,7 +155,8 @@ def train_model(model, train_loader, test_loader, epochs=10):
             optimizer.step()
             running_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Loss: {running_loss/len(train_loader)}")
+        print(f"Epoch {epoch + 1}, Loss: {running_loss / len(train_loader)}")
+
         if (epoch) % 10 == 0:
             # Evaluate on test data
             model.eval()
@@ -156,6 +166,9 @@ def train_model(model, train_loader, test_loader, epochs=10):
 
             with torch.no_grad():
                 for inputs, labels in test_loader:
+                    if torch.cuda.is_available():
+                        inputs = inputs.to("cuda:0")
+
                     predicted = model(inputs).squeeze()
                     total += labels.size(0)
 
@@ -178,13 +191,21 @@ def train_model(model, train_loader, test_loader, epochs=10):
             f1 = f1_score(all_labels, (all_predictions > 0.5).astype(float))
 
             # Compute Accuracy
-            accuracy = accuracy_score(all_labels,  (all_predictions > 0.5).astype(float))
+            accuracy = accuracy_score(all_labels, (all_predictions > 0.5).astype(float))
 
-            print(f"Test Accuracy: {accuracy}% ", f"AUROC: {auroc}% ", f"AUPR: {aupr}% ", f"F1-score: {f1}% " )
+            print(f"Test Accuracy: {accuracy} ", f"AUROC: {auroc} ", f"AUPR: {aupr} ", f"F1-score: {f1} ")
+
+            if use_wandb:
+                wandb.log(data={f"{run_name}_Eval_Accuracy": accuracy, f"{run_name}_Eval_AUROC": auroc,
+                                f"{run_name}_Eval_AUPR": aupr, f"{run_name}_Eval_F1-score": f1}, commit=False)
+
+        if use_wandb:
+            wandb.log(data={f"{run_name}_Loss": running_loss / len(train_loader)}, commit=True)
+
     return accuracy, auroc, aupr, f1
 
-def test_model(model, test_loader):
 
+def test_model(model, test_loader):
     # Evaluate on test data
     model.eval()
     total = 0
@@ -193,6 +214,9 @@ def test_model(model, test_loader):
 
     with torch.no_grad():
         for inputs, labels in test_loader:
+            if torch.cuda.is_available():
+                inputs = inputs.to("cuda:0")
+
             predicted = model(inputs).squeeze()
             total += labels.size(0)
 
@@ -215,13 +239,17 @@ def test_model(model, test_loader):
     f1 = f1_score(all_labels, (all_predictions > 0.5).astype(float))
 
     # Compute Accuracy
-    accuracy = accuracy_score(all_labels,  (all_predictions > 0.5).astype(float))
+    accuracy = accuracy_score(all_labels, (all_predictions > 0.5).astype(float))
 
-    print(f"Test Accuracy: {accuracy}% ", f"AUROC: {auroc}% ", f"AUPR: {aupr}% ", f"F1-score: {f1}% " )
-    return accuracy, auroc, aupr, f1
+    # Compute confusion matrix
+    cm = confusion_matrix(all_labels, (all_predictions > 0.5).astype(float))
 
-def cross_validate_SplitOnly(model, dataset, k_folds=5, epochs=10, seed = 42):
-    kfold = KFold(n_splits=k_folds, shuffle=True,random_state=seed)
+    print(f"Test Accuracy: {accuracy} ", f"AUROC: {auroc} ", f"AUPR: {aupr} ", f"F1-score: {f1} ")
+    return accuracy, auroc, aupr, f1, cm
+
+
+def cross_validate_SplitOnly(model, dataset, k_folds=5, epochs=10, seed=42):
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
 
     for fold, (train_indices, val_indices) in enumerate(kfold.split(dataset)):
@@ -234,7 +262,6 @@ def cross_validate_SplitOnly(model, dataset, k_folds=5, epochs=10, seed = 42):
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
         f1_ls.append(f1_score)
-
 
         # Optionally save the model after each fold
         # torch.save(model.state_dict(), f'model_fold_{fold}.pth')

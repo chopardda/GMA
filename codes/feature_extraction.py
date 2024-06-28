@@ -1,13 +1,22 @@
+import os
+import shutil
+import torch.cuda
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.metrics import ConfusionMatrixDisplay
 from models import LSTMModel, CNN1D
 import numpy as np
 import argparse
 from utils_features import train_model, test_model, set_seeds, create_dataloaders_Kfold, CustomDataset
+import wandb
+import time
+import matplotlib.pyplot as plt
+
+WANDB_PROJECT_NAME = "GMA Project"
 
 
-def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64):
+def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False):
     # Group indices by original sample
     grouped_indices = {}
     for idx, original_idx in enumerate(dataset.original_indices):
@@ -34,6 +43,11 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64)
     stratified_kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     train_val_stratify_labels = [dataset.labels[grouped_indices[sample_id][0]] for sample_id in train_val_indices]
 
+    # Initialize WandB runs if requested
+    if use_wandb:
+        run = wandb.init(project=WANDB_PROJECT_NAME, name=f"run_{time.time()}", reinit=True)
+        wandb.config.update({"epochs": epochs, "batch_size": batch_size, "seed": seed, "model": model.__class__.__name__})
+
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
     best_model = None
     best_val_auroc = 0
@@ -49,7 +63,7 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64)
 
         train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
 
-        acc, auroc, aupr, f1_score = train_model(model, train_loader, val_loader, epochs=epochs)
+        acc, auroc, aupr, f1_score = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb, fold=fold)
         acc_ls.append(acc)
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
@@ -70,9 +84,16 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64)
     print(f'Average AUPR: {np.mean(aupr_ls)}')
     print(f'Average F1 score: {np.mean(f1_ls)}')
 
-    # Train final model on the entire training + validation set
+    if use_wandb:
+        wandb.log({"Average accuracy": np.mean(acc_ls), "Average AUROC": np.mean(auroc_ls),
+                   "Average AUPR": np.mean(aupr_ls), "Average F1 score": np.mean(f1_ls)})
 
-    test_acc, test_auroc, test_aupr, test_f1_score = test_model(best_model, test_loader)
+    # Train final model on the entire training + validation set
+    test_acc, test_auroc, test_aupr, test_f1_score, cm = test_model(best_model, test_loader)
+
+    # Create confusion matrix image
+    cm_image = ConfusionMatrixDisplay(confusion_matrix=cm)
+    cm_image.plot()
 
     print('--------------------------------')
     print('TEST SET RESULTS')
@@ -81,6 +102,16 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64)
     print(f'Test AUROC: {test_auroc}')
     print(f'Test AUPR: {test_aupr}')
     print(f'Test F1 score: {test_f1_score}')
+
+    if use_wandb:
+        wandb.log({"Test accuracy": test_acc, "Test AUROC": test_auroc, "Test AUPR": test_aupr, "Test F1 score": test_f1_score,
+                   "Confusion Matrix": plt})
+        run_dir = os.path.dirname(run.dir)
+        run.finish()
+
+        # Delete local wandb files
+        shutil.rmtree(run_dir)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Run cross-validation for model training.')
@@ -94,25 +125,47 @@ def main():
                         help='Directory with the tracked coordinates')
     parser.add_argument('--model', type=str, default='CNN',
                         help='Model architecture to use for training. Choose between CNN and LSTM.')
+    parser.add_argument("--wandb", action='store_true', default=False, help="Use WandB")
+    parser.add_argument('--num_iterations', type=int, default=1, help='Number of iterations')
     args = parser.parse_args()
 
 
     set_seeds(args.seed)
-    # Create dataset
-    dataset = CustomDataset(args.directory, args.type_a)
 
-    # Set model
-    if args.model == 'CNN':
-        model = CNN1D(sequence_length=dataset.min_dim_size)
-    elif args.model == 'LSTM':
-        model = LSTMModel(input_size=dataset.min_dim_size)
+    # Initiate wandb if requested
+    if args.wandb:
+        wandb_URL = os.environ.get('WANDB_LOCAL_URL')
+        wandb.login(host=wandb_URL)
 
-    # Training one data split
-    # train_loader, test_loader = create_dataloaders(dataset)
-    # train_model(model, train_loader, test_loader, epochs=100)
+    # Randomly generate a new seed for each iteration
+    seeds = np.random.randint(0, 10000, args.num_iterations)
 
-    # Cross validation
-    cross_validate(model, dataset, k_folds=args.folds, epochs=args.epochs, seed=args.seed, batch_size=args.batch_size)
+    # Do iterations
+    for i in range(args.num_iterations):
+        set_seeds(seeds[i])
+        # Create dataset
+        dataset = CustomDataset(args.directory, args.type_a)
+
+        # Set model
+        if args.model == 'CNN':
+            model = CNN1D(sequence_length=dataset.min_dim_size)
+        elif args.model == 'LSTM':
+            model = LSTMModel(input_size=dataset.min_dim_size)
+        else:
+            print("Model undefined")
+            exit(-1)
+
+        if torch.cuda.is_available():
+            model = model.to("cuda:0")
+
+        # Training one data split
+        # train_loader, test_loader = create_dataloaders(dataset)
+        # train_model(model, train_loader, test_loader, epochs=100)
+
+        # Cross validation
+        cross_validate(model, dataset, k_folds=args.folds, epochs=args.epochs, seed=seeds[i], batch_size=args.batch_size,
+                       use_wandb=args.wandb)
+
 
 if __name__ == "__main__":
     main()
