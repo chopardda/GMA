@@ -13,10 +13,9 @@ import wandb
 import time
 import matplotlib.pyplot as plt
 
-WANDB_PROJECT_NAME = "GMA Project"
 
-
-def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False):
+def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, wandb_project=None,
+                   wandb_run_prefix=None):
     # Group indices by original sample
     grouped_indices = {}
     for idx, original_idx in enumerate(dataset.original_indices):
@@ -33,9 +32,9 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
                                                        stratify=[dataset.labels[indices[0]] for indices in
                                                                  grouped_indices.values()])
     test_loader = DataLoader(
-        Subset(dataset, [idx for original_idx in test_indices for idx in grouped_indices[original_idx]]), batch_size=batch_size,
+        Subset(dataset, [idx for original_idx in test_indices for idx in grouped_indices[original_idx]]),
+        batch_size=batch_size,
         shuffle=False)
-
 
     # kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
@@ -45,8 +44,9 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
 
     # Initialize WandB runs if requested
     if use_wandb:
-        run = wandb.init(project=WANDB_PROJECT_NAME, name=f"run_{time.time()}", reinit=True)
-        wandb.config.update({"epochs": epochs, "batch_size": batch_size, "seed": seed, "model": model.__class__.__name__})
+        run = wandb.init(project=wandb_project, name=f"{wandb_run_prefix}_{time.time()}", reinit=True)
+        wandb.config.update(
+            {"epochs": epochs, "batch_size": batch_size, "seed": seed, "model": model.__class__.__name__})
 
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
     best_model = None
@@ -63,7 +63,8 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
 
         train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
 
-        acc, auroc, aupr, f1_score = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb, fold=fold)
+        acc, auroc, aupr, f1_score = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb,
+                                                 fold=fold)
         acc_ls.append(acc)
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
@@ -104,7 +105,8 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
     print(f'Test F1 score: {test_f1_score}')
 
     if use_wandb:
-        wandb.log({"Test accuracy": test_acc, "Test AUROC": test_auroc, "Test AUPR": test_aupr, "Test F1 score": test_f1_score,
+        wandb.log({"Test accuracy": test_acc, "Test AUROC": test_auroc, "Test AUPR": test_aupr,
+                   "Test F1 score": test_f1_score,
                    "Confusion Matrix": plt})
         run_dir = os.path.dirname(run.dir)
         run.finish()
@@ -125,10 +127,11 @@ def main():
                         help='Directory with the tracked coordinates')
     parser.add_argument('--model', type=str, default='CNN',
                         help='Model architecture to use for training. Choose between CNN and LSTM.')
-    parser.add_argument("--wandb", action='store_true', default=False, help="Use WandB")
     parser.add_argument('--num_iterations', type=int, default=1, help='Number of iterations')
+    parser.add_argument("--wandb", action='store_true', default=False, help="Use WandB")
+    parser.add_argument("--wandb_project", type=str, default="GMA Project", help="WandB project name")
+    parser.add_argument("--wandb_run_prefix", type=str, default="run", help="WandB run prefix")
     args = parser.parse_args()
-
 
     set_seeds(args.seed)
 
@@ -163,8 +166,9 @@ def main():
         # train_model(model, train_loader, test_loader, epochs=100)
 
         # Cross validation
-        cross_validate(model, dataset, k_folds=args.folds, epochs=args.epochs, seed=seeds[i], batch_size=args.batch_size,
-                       use_wandb=args.wandb)
+        cross_validate(model, dataset, k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
+                       batch_size=args.batch_size,
+                       use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
 
 
 if __name__ == "__main__":
