@@ -86,8 +86,8 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
     print(f'Average F1 score: {np.mean(f1_ls)}')
 
     if use_wandb:
-        wandb.log({"Average accuracy": np.mean(acc_ls), "Average AUROC": np.mean(auroc_ls),
-                   "Average AUPR": np.mean(aupr_ls), "Average F1 score": np.mean(f1_ls)})
+        wandb.log({"Evaluation/Average accuracy": np.mean(acc_ls), "Evaluation/Average AUROC": np.mean(auroc_ls),
+                   "Evaluation/Average AUPR": np.mean(aupr_ls), "Evaluation/Average F1 score": np.mean(f1_ls)})
 
     # Train final model on the entire training + validation set
     test_acc, test_auroc, test_aupr, test_f1_score, cm = test_model(best_model, test_loader)
@@ -105,9 +105,9 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
     print(f'Test F1 score: {test_f1_score}')
 
     if use_wandb:
-        wandb.log({"Test accuracy": test_acc, "Test AUROC": test_auroc, "Test AUPR": test_aupr,
-                   "Test F1 score": test_f1_score,
-                   "Confusion Matrix": plt})
+        wandb.log({"Test/Test accuracy": test_acc, "Test/Test AUROC": test_auroc, "Test/Test AUPR": test_aupr,
+                   "Test/Test F1 score": test_f1_score,
+                   "Test/Confusion Matrix": plt})
         run_dir = os.path.dirname(run.dir)
         run.finish()
 

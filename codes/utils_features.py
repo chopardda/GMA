@@ -196,11 +196,11 @@ def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fo
             print(f"Test Accuracy: {accuracy} ", f"AUROC: {auroc} ", f"AUPR: {aupr} ", f"F1-score: {f1} ")
 
             if use_wandb:
-                wandb.log(data={f"{run_name}_Eval_Accuracy": accuracy, f"{run_name}_Eval_AUROC": auroc,
-                                f"{run_name}_Eval_AUPR": aupr, f"{run_name}_Eval_F1-score": f1}, commit=False)
+                wandb.log(data={f"Evaluation/{run_name}_Eval_Accuracy": accuracy, f"Evaluation/{run_name}_Eval_AUROC": auroc,
+                                f"Evaluation/{run_name}_Eval_AUPR": aupr, f"Evaluation/{run_name}_Eval_F1-score": f1}, commit=False)
 
         if use_wandb:
-            wandb.log(data={f"{run_name}_Loss": running_loss / len(train_loader)}, commit=True)
+            wandb.log(data={f"Train/{run_name}_Loss": running_loss / len(train_loader)}, commit=True)
 
     return accuracy, auroc, aupr, f1
 
