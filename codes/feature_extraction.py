@@ -4,8 +4,10 @@ import torch.cuda
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import KFold, StratifiedKFold
-from sklearn.metrics import ConfusionMatrixDisplay
 from models import LSTMModel, CNN1D
+from sklearn.metrics import ConfusionMatrixDisplay, roc_auc_score, precision_recall_curve, auc, f1_score, accuracy_score, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 import argparse
 from utils_features import train_model, test_model, set_seeds, create_dataloaders_Kfold, CustomDataset
@@ -14,7 +16,7 @@ import time
 import matplotlib.pyplot as plt
 
 
-def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, wandb_project=None,
+def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, wandb_project=None,
                    wandb_run_prefix=None):
     # Group indices by original sample
     grouped_indices = {}
@@ -31,13 +33,8 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
     train_val_indices, test_indices = train_test_split(all_indices, test_size=0.2, random_state=seed,
                                                        stratify=[dataset.labels[indices[0]] for indices in
                                                                  grouped_indices.values()])
-    test_loader = DataLoader(
-        Subset(dataset, [idx for original_idx in test_indices for idx in grouped_indices[original_idx]]),
-        batch_size=batch_size,
-        shuffle=False)
 
     # kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
-
     # Stratified K-Fold cross-validation on the training/validation set
     stratified_kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     train_val_stratify_labels = [dataset.labels[grouped_indices[sample_id][0]] for sample_id in train_val_indices]
@@ -46,7 +43,7 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
     if use_wandb:
         run = wandb.init(project=wandb_project, name=f"{wandb_run_prefix}_{time.time()}", reinit=True)
         wandb.config.update(
-            {"epochs": epochs, "batch_size": batch_size, "seed": seed, "model": model.__class__.__name__})
+            {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__})
 
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
     best_model = None
@@ -61,14 +58,44 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
         train_indices = [idx for i in train_idx for idx in grouped_indices[train_val_indices[i]]]
         val_indices = [idx for i in val_idx for idx in grouped_indices[train_val_indices[i]]]
 
-        train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
+        if model_type == 'RF':
+            train_data = [dataset[i] for i in train_indices]
+            val_data = [dataset[i] for i in val_indices]
 
-        acc, auroc, aupr, f1_score = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb,
-                                                 fold=fold)
+            # Random forest process data
+            train_X = np.array([x[0].numpy() for x in train_data])
+            train_y = np.array([x[1].numpy() for x in train_data])
+            val_X = np.array([x[0].numpy() for x in val_data])
+            val_y = np.array([x[1].numpy() for x in val_data])
+            # Flattening data TODO: Extract more informative features instead of flattening if desired
+            train_X = train_X.reshape(train_X.shape[0], -1)
+            val_X = val_X.reshape(val_X.shape[0], -1)
+
+            # Scaling the data
+            scaler = StandardScaler().fit(train_X)
+            train_X = scaler.transform(train_X)
+            val_X = scaler.transform(val_X)
+
+            # Random forest train and evaluate
+            model.fit(train_X, train_y)
+            val_pred = model.predict(val_X)
+            val_proba = model.predict_proba(val_X)[:, 1]
+
+            acc = accuracy_score(val_y, val_pred)
+            auroc = roc_auc_score(val_y, val_proba)
+            precision, recall, _ = precision_recall_curve(val_y, val_proba)
+            aupr = auc(recall, precision)
+            f1 = f1_score(val_y, val_pred)
+
+        elif model_type in ('CNN', 'LSTM'):
+            train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
+
+            acc, auroc, aupr, f1 = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb,
+                                                     fold=fold)
         acc_ls.append(acc)
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
-        f1_ls.append(f1_score)
+        f1_ls.append(f1)
 
         if auroc > best_val_auroc:
             best_val_auroc = auroc
@@ -89,8 +116,22 @@ def cross_validate(model, dataset, k_folds=5, epochs=10, seed=42, batch_size=64,
         wandb.log({"Evaluation/Average accuracy": np.mean(acc_ls), "Evaluation/Average AUROC": np.mean(auroc_ls),
                    "Evaluation/Average AUPR": np.mean(aupr_ls), "Evaluation/Average F1 score": np.mean(f1_ls)})
 
+    if model_type == 'RF':
+        test_indices = [idx for original_idx in test_indices for idx in grouped_indices[original_idx]]
+        test_data = [dataset[i] for i in test_indices]
+        test_X = np.array([x[0].numpy() for x in test_data])
+        test_y = np.array([x[1].numpy() for x in test_data])
+        test_X = test_X.reshape(test_X.shape[0], -1)
+        test_X = scaler.transform(test_X)
+        test_loader = [test_X, test_y]
+    else:
+        test_loader = DataLoader(
+            Subset(dataset, [idx for original_idx in test_indices for idx in grouped_indices[original_idx]]),
+            batch_size=batch_size,
+            shuffle=False)
+
     # Train final model on the entire training + validation set
-    test_acc, test_auroc, test_aupr, test_f1_score, cm = test_model(best_model, test_loader)
+    test_acc, test_auroc, test_aupr, test_f1_score, cm = test_model(best_model, test_loader, model_type)
 
     # Create confusion matrix image
     cm_image = ConfusionMatrixDisplay(confusion_matrix=cm)
@@ -126,7 +167,7 @@ def main():
     parser.add_argument('--directory', type=str, default='../output/tracked_merged',
                         help='Directory with the tracked coordinates')
     parser.add_argument('--model', type=str, default='CNN',
-                        help='Model architecture to use for training. Choose between CNN and LSTM.')
+                        help='Model architecture to use for training. Choose between CNN, LSTM and RF.')
     parser.add_argument('--num_iterations', type=int, default=1, help='Number of iterations')
     parser.add_argument("--wandb", action='store_true', default=False, help="Use WandB")
     parser.add_argument("--wandb_project", type=str, default="GMA Project", help="WandB project name")
@@ -154,6 +195,8 @@ def main():
             model = CNN1D(sequence_length=dataset.min_dim_size)
         elif args.model == 'LSTM':
             model = LSTMModel(input_size=dataset.min_dim_size)
+        elif args.model == 'RF':
+            model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
         else:
             print("Model undefined")
             exit(-1)
@@ -166,7 +209,7 @@ def main():
         # train_model(model, train_loader, test_loader, epochs=100)
 
         # Cross validation
-        cross_validate(model, dataset, k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
+        cross_validate(model, dataset,args, model_type = args.model,  k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
                        batch_size=args.batch_size,
                        use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
 

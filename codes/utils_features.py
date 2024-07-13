@@ -196,8 +196,8 @@ def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fo
             print(f"Test Accuracy: {accuracy} ", f"AUROC: {auroc} ", f"AUPR: {aupr} ", f"F1-score: {f1} ")
 
             if use_wandb:
-                wandb.log(data={f"Evaluation/{run_name}_Eval_Accuracy": accuracy, f"Evaluation/{run_name}_Eval_AUROC": auroc,
-                                f"Evaluation/{run_name}_Eval_AUPR": aupr, f"Evaluation/{run_name}_Eval_F1-score": f1}, commit=False)
+                wandb.log(data={f"Evaluation_train/{run_name}_Eval_Accuracy": accuracy, f"Evaluation_train/{run_name}_Eval_AUROC": auroc,
+                                f"Evaluation_train/{run_name}_Eval_AUPR": aupr, f"Evaluation_train/{run_name}_Eval_F1-score": f1}, commit=False)
 
         if use_wandb:
             wandb.log(data={f"Train/{run_name}_Loss": running_loss / len(train_loader)}, commit=True)
@@ -205,28 +205,32 @@ def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fo
     return accuracy, auroc, aupr, f1
 
 
-def test_model(model, test_loader):
-    # Evaluate on test data
-    model.eval()
-    total = 0
-    all_predictions = []
-    all_labels = []
+def test_model(model, test_loader, model_type):
+    if model_type == 'RF':
+        val_pred = model.predict(test_loader[0])
+        all_predictions = model.predict_proba(test_loader[0])[:, 1]
+        all_labels = test_loader[1]
+    else:
+        # Evaluate on test data
+        model.eval()
+        total = 0
+        all_predictions = []
+        all_labels = []
+        with torch.no_grad():
+            for inputs, labels in test_loader:
+                if torch.cuda.is_available():
+                    inputs = inputs.to("cuda:0")
 
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            if torch.cuda.is_available():
-                inputs = inputs.to("cuda:0")
+                predicted = model(inputs).squeeze()
+                total += labels.size(0)
 
-            predicted = model(inputs).squeeze()
-            total += labels.size(0)
-
-            if predicted.dim() == 0:
-                predicted = predicted.unsqueeze(0)
-            all_predictions.extend(predicted.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-    # Convert lists to numpy arrays for sklearn functions
-    all_predictions = np.array(all_predictions)
-    all_labels = np.array(all_labels)
+                if predicted.dim() == 0:
+                    predicted = predicted.unsqueeze(0)
+                all_predictions.extend(predicted.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        # Convert lists to numpy arrays for sklearn functions
+        all_predictions = np.array(all_predictions)
+        all_labels = np.array(all_labels)
 
     # Compute AUROC
     auroc = roc_auc_score(all_labels, all_predictions)
@@ -273,12 +277,3 @@ def cross_validate_SplitOnly(model, dataset, k_folds=5, epochs=10, seed=42):
     print(f'Average AUROC: {np.mean(auroc_ls)}')
     print(f'Average AUPR: {np.mean(aupr_ls)}')
     print(f'Average F1 score: {np.mean(f1_ls)}')
-
-# def create_dataloaders(dataset, batch_size=16, test_split=0.2):
-#     train_size = int((1 - test_split) * len(dataset))
-#     test_size = len(dataset) - train_size
-#     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
-#
-#     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-#     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-#     return train_loader, test_loader
