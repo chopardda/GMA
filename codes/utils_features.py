@@ -35,11 +35,11 @@ def create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=16)
 class CustomDataset(Dataset):
     def __init__(self, directory, type_a='late'):
         if type_a == 'late':
-            positive = 'FN'
-            negative = 'F-'
+            positive = '_FN_c'
+            negative = '_F-_c'
         elif type_a == 'early':
-            positive = 'N'
-            negative = 'PR'
+            positive = '_N_c'
+            negative = '_PR_c'
         keypoints = [
             "nose",
             "left wrist",
