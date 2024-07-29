@@ -42,8 +42,12 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
     # Initialize WandB runs if requested
     if use_wandb:
         run = wandb.init(project=wandb_project, name=f"{wandb_run_prefix}_{time.time()}", reinit=True)
-        wandb.config.update(
-            {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__})
+        config_dict = {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__}
+
+        if args.num_outlier_passes >= 0:
+            config_dict["num_outlier_passes"] = args.num_outlier_passes
+
+        wandb.config.update(config_dict)
 
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
     best_model = None
@@ -172,6 +176,7 @@ def main():
     parser.add_argument("--wandb", action='store_true', default=False, help="Use WandB")
     parser.add_argument("--wandb_project", type=str, default="GMA Project", help="WandB project name")
     parser.add_argument("--wandb_run_prefix", type=str, default="run", help="WandB run prefix")
+    parser.add_argument("--num_outlier_passes", type=int, default=-1, help="Number of outlier passes")
     args = parser.parse_args()
 
     set_seeds(args.seed)
@@ -201,7 +206,7 @@ def main():
             print("Model undefined")
             exit(-1)
 
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and args.model != "RF":
             model = model.to("cuda:0")
 
         # Training one data split
