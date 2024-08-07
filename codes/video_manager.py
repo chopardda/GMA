@@ -884,9 +884,13 @@ class VideoObject:
         # Add last frame
         keyframes.append(len(self.video))
 
-        for i in range(len(keyframes) - 1):
-            if keyframes[i] <= frame_index < keyframes[i + 1]:
-                return keyframes[i], frame_index - keyframes[i]
+        if frame_index < min(keyframes):
+            return min(keyframes), frame_index
+
+        else:
+            for i in range(len(keyframes) - 1):
+                if keyframes[i] <= frame_index < keyframes[i + 1]:
+                    return keyframes[i], frame_index - keyframes[i]
 
 
     def get_sorted_outlier_table(self):
