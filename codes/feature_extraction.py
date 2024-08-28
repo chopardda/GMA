@@ -42,7 +42,7 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
     # Initialize WandB runs if requested
     if use_wandb:
         run = wandb.init(project=wandb_project, name=f"{wandb_run_prefix}_{time.time()}", reinit=True)
-        config_dict = {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__}
+        config_dict = {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__, "feature_type": dataset.feature_type}
 
         if args.num_outlier_passes >= 0:
             config_dict["num_outlier_passes"] = args.num_outlier_passes
@@ -177,6 +177,7 @@ def main():
     parser.add_argument("--wandb_project", type=str, default="GMA Project", help="WandB project name")
     parser.add_argument("--wandb_run_prefix", type=str, default="run", help="WandB run prefix")
     parser.add_argument("--num_outlier_passes", type=int, default=-1, help="Number of outlier passes")
+    parser.add_argument("--feature_type", type=str, default='coordinates', help="Type of input features. Choose between 'coordinates', 'angles', or 'both'")
     args = parser.parse_args()
 
     set_seeds(args.seed)
@@ -193,11 +194,16 @@ def main():
     for i in range(args.num_iterations):
         set_seeds(seeds[i])
         # Create dataset
-        dataset = CustomDataset(args.directory, args.type_a)
+        dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
 
         # Set model
         if args.model == 'CNN':
-            model = CNN1D(sequence_length=dataset.min_dim_size)
+            if dataset.feature_type == 'both':
+                model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
+            elif dataset.feature_type == 'angles':
+                model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
+            else:
+                model = CNN1D(sequence_length=dataset.min_dim_size)
         elif args.model == 'LSTM':
             model = LSTMModel(input_size=dataset.min_dim_size)
         elif args.model == 'RF':

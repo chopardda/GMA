@@ -33,13 +33,22 @@ def create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=16)
 
 
 class CustomDataset(Dataset):
-    def __init__(self, directory, type_a='late'):
+    def __init__(self, directory, type_a='late', feature_type='coordinates'):
+        """
+        Args:
+            directory (str): Directory where the tracked points are stored.
+            type_a (str): Type of classification ('late' or 'early').
+            feature_type (str): Type of features to use ('coordinates', 'angles', or 'both').
+        """
         if type_a == 'late':
             positive = '_FN_c'
             negative = '_F-_c'
         elif type_a == 'early':
             positive = '_N_c'
             negative = '_PR_c'
+
+        self.feature_type = feature_type
+
         keypoints = [
             "nose",
             "left wrist",
@@ -102,7 +111,22 @@ class CustomDataset(Dataset):
 
                 data_order_x = data.pivot(index='keypoint', columns='frame_index', values='x').fillna(0)
                 data_order_y = data.pivot(index='keypoint', columns='frame_index', values='y').fillna(0)
-                combined_data = torch.cat((torch.tensor(data_order_x.values), torch.tensor(data_order_y.values)))
+                combined_data = None
+
+                if self.feature_type == 'coordinates' or self.feature_type == 'both':
+                    # Include keypoint coordinates
+                    coordinates_data = torch.cat((torch.tensor(data_order_x.values), torch.tensor(data_order_y.values)))
+                    combined_data = coordinates_data
+
+                if self.feature_type == 'angles' or self.feature_type == 'both':
+                    # Compute angles between certain keypoints
+                    angles = self.compute_angles(data_order_x, data_order_y, keypoints)
+                    angles_tensor = torch.tensor(angles)  # Add a dimension to match combined_data
+                    if combined_data is None:
+                        combined_data = angles_tensor
+                    else:
+                        combined_data = torch.cat((combined_data, angles_tensor), dim=0)
+
                 all_data.append(combined_data)
                 labels.append(int(negative in filename))
 
@@ -125,6 +149,57 @@ class CustomDataset(Dataset):
         self.features = new_all_data
         self.labels = torch.tensor(new_labels)
         self.original_indices = original_indices
+
+    def compute_angles(self, data_order_x, data_order_y, keypoints):
+        # Define pairs of keypoints for which angles will be calculated
+        angle_pairs = [
+            ("head top", "nose", "head bottom"),  # head top to neck angle
+            ("right ear", "nose", "left ear"),  # left to right ear angle
+            ("left elbow", "left shoulder", "head bottom"),  # head to shoulder angle
+            ("right elbow", "right shoulder", "head bottom"),  # head to shoulder angle
+            ("left wrist", "left elbow", "left shoulder"),  # left elbow angle
+            ("right wrist", "right elbow", "right shoulder"),  # right elbow angle
+            ("left knee", "left hip", "left shoulder"),  # left hip angle
+            ("right knee", "right hip", "right shoulder"),  # right hip angle
+            ("left hip", "left knee", "left ankle"),  # left knee angle
+            ("right hip", "right knee", "right ankle")  # right knee angle
+        ]
+
+        angles = []
+
+        for kp1, kp2, kp3 in angle_pairs:
+            if kp1 in keypoints and kp2 in keypoints and kp3 in keypoints:
+                p1_x, p1_y = data_order_x.loc[kp1], data_order_y.loc[kp1]
+                p2_x, p2_y = data_order_x.loc[kp2], data_order_y.loc[kp2]
+                p3_x, p3_y = data_order_x.loc[kp3], data_order_y.loc[kp3]
+
+                # Calculate vectors
+                v1 = np.array([p1_x - p2_x, p1_y - p2_y])  # vector from 'kp2' tp 'kp1'
+                v2 = np.array([p3_x - p2_x, p3_y - p2_y])  # vector from 'kp2' to 'kp3'
+
+                # Compute the norms of the vectors
+                norm_v1 = np.linalg.norm(v1, axis=0)
+                norm_v2 = np.linalg.norm(v2, axis=0)
+
+                # Create a mask for where either norm is zero
+                zero_norm_mask = (norm_v1 == 0) | (norm_v2 == 0)
+
+                # Initialize an array for angles
+                angle = np.zeros(p1_x.shape)
+
+                # Compute angles only where norms are non-zero
+                if not zero_norm_mask.all():  # If not all frames have zero norms
+                    valid_dot_product = np.einsum('ij,ij->j', v1[:, ~zero_norm_mask], v2[:, ~zero_norm_mask])
+                    valid_cosine_angle = valid_dot_product / (norm_v1[~zero_norm_mask] * norm_v2[~zero_norm_mask])
+                    valid_angle = np.arccos(np.clip(valid_cosine_angle, -1.0, 1.0))
+
+                    # Assign computed angles back to the array
+                    angle[~zero_norm_mask] = valid_angle
+
+                angles.append(angle)
+
+        # Return angles as a numpy array (flattened)
+        return np.stack(angles, axis=0) #np.concatenate(angles)
 
     def __len__(self):
         return len(self.features)
@@ -196,8 +271,10 @@ def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fo
             print(f"Test Accuracy: {accuracy} ", f"AUROC: {auroc} ", f"AUPR: {aupr} ", f"F1-score: {f1} ")
 
             if use_wandb:
-                wandb.log(data={f"Evaluation_train/{run_name}_Eval_Accuracy": accuracy, f"Evaluation_train/{run_name}_Eval_AUROC": auroc,
-                                f"Evaluation_train/{run_name}_Eval_AUPR": aupr, f"Evaluation_train/{run_name}_Eval_F1-score": f1}, commit=False)
+                wandb.log(data={f"Evaluation_train/{run_name}_Eval_Accuracy": accuracy,
+                                f"Evaluation_train/{run_name}_Eval_AUROC": auroc,
+                                f"Evaluation_train/{run_name}_Eval_AUPR": aupr,
+                                f"Evaluation_train/{run_name}_Eval_F1-score": f1}, commit=False)
 
         if use_wandb:
             wandb.log(data={f"Train/{run_name}_Loss": running_loss / len(train_loader)}, commit=True)
