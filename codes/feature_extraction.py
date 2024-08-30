@@ -160,7 +160,115 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
         shutil.rmtree(run_dir)
 
 
+def sweep_function():
+    dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
+
+    # Set model
+    if args.model == 'CNN':
+        if dataset.feature_type == 'both':
+            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
+        elif dataset.feature_type == 'angles':
+            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
+        else:
+            model = CNN1D(sequence_length=dataset.min_dim_size)
+    elif args.model == 'LSTM':
+        model = LSTMModel(input_size=dataset.min_dim_size)
+    elif args.model == 'RF':
+        model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
+    else:
+        print("Model undefined")
+        exit(-1)
+
+    if torch.cuda.is_available() and args.model != "RF":
+        model = model.to("cuda:0")
+
+    # Training one data split
+    # train_loader, test_loader = create_dataloaders(dataset)
+    # train_model(model, train_loader, test_loader, epochs=100)
+
+    # Cross validation
+    cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=args.epochs, seed=args.seed,
+                   batch_size=args.batch_size,
+                   use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
+
+
 def main():
+    # Initiate wandb if requested
+    if args.wandb:
+        wandb_URL = os.environ.get('WANDB_LOCAL_URL')
+        wandb.login(host=wandb_URL)
+
+    # Verify wandb was selected if sweeps are enabled
+    if args.sweep:
+        if not args.wandb:
+            print("WandB must be enabled for sweeps")
+            exit(-1)
+
+        # Set up sweep config
+        if args.model == "RF":
+            sweep_configuration = {
+                "method": "bayes",
+                "metric": {
+                    "name": "Test/Test AUROC",
+                    "goal": "maximize"
+                },
+                "parameters": {
+                    "estimators": {
+                        "min": 1,
+                        "max": 200
+                    }
+                }
+            }
+
+        else:
+            print("Model not supported for sweeps")
+            exit(-2)
+
+        sweep_id = wandb.sweep(sweep_configuration, project=args.wandb_project)
+
+        # Start sweep job.
+        wandb.agent(sweep_id, function=sweep_function, count=10)
+
+    else:
+        # Randomly generate a new seed for each iteration
+        seeds = np.random.randint(0, 10000, args.num_iterations)
+
+        # Do iterations
+        for i in range(args.num_iterations):
+            set_seeds(seeds[i])
+            # Create dataset
+            dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
+
+            # Set model
+            if args.model == 'CNN':
+                if dataset.feature_type == 'both':
+                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
+                elif dataset.feature_type == 'angles':
+                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
+                else:
+                    model = CNN1D(sequence_length=dataset.min_dim_size)
+            elif args.model == 'LSTM':
+                model = LSTMModel(input_size=dataset.min_dim_size)
+            elif args.model == 'RF':
+                model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
+            else:
+                print("Model undefined")
+                exit(-1)
+
+            if torch.cuda.is_available() and args.model != "RF":
+                model = model.to("cuda:0")
+
+            # Training one data split
+            # train_loader, test_loader = create_dataloaders(dataset)
+            # train_model(model, train_loader, test_loader, epochs=100)
+
+            # Cross validation
+            cross_validate(model, dataset,args, model_type = args.model,  k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
+                           batch_size=args.batch_size,
+                           use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run cross-validation for model training.')
     parser.add_argument('--seed', type=int, default=20, help='Random seed for reproducibility')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
@@ -178,52 +286,7 @@ def main():
     parser.add_argument("--wandb_run_prefix", type=str, default="run", help="WandB run prefix")
     parser.add_argument("--num_outlier_passes", type=int, default=-1, help="Number of outlier passes")
     parser.add_argument("--feature_type", type=str, default='coordinates', help="Type of input features. Choose between 'coordinates', 'angles', or 'both'")
+    parser.add_argument("--sweep", action='store_true', default=False, help="Do sweeps")
     args = parser.parse_args()
-
     set_seeds(args.seed)
-
-    # Initiate wandb if requested
-    if args.wandb:
-        wandb_URL = os.environ.get('WANDB_LOCAL_URL')
-        wandb.login(host=wandb_URL)
-
-    # Randomly generate a new seed for each iteration
-    seeds = np.random.randint(0, 10000, args.num_iterations)
-
-    # Do iterations
-    for i in range(args.num_iterations):
-        set_seeds(seeds[i])
-        # Create dataset
-        dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
-
-        # Set model
-        if args.model == 'CNN':
-            if dataset.feature_type == 'both':
-                model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
-            elif dataset.feature_type == 'angles':
-                model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
-            else:
-                model = CNN1D(sequence_length=dataset.min_dim_size)
-        elif args.model == 'LSTM':
-            model = LSTMModel(input_size=dataset.min_dim_size)
-        elif args.model == 'RF':
-            model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
-        else:
-            print("Model undefined")
-            exit(-1)
-
-        if torch.cuda.is_available() and args.model != "RF":
-            model = model.to("cuda:0")
-
-        # Training one data split
-        # train_loader, test_loader = create_dataloaders(dataset)
-        # train_model(model, train_loader, test_loader, epochs=100)
-
-        # Cross validation
-        cross_validate(model, dataset,args, model_type = args.model,  k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
-                       batch_size=args.batch_size,
-                       use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
-
-
-if __name__ == "__main__":
     main()
