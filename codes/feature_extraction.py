@@ -16,8 +16,7 @@ import time
 import matplotlib.pyplot as plt
 
 
-def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, wandb_project=None,
-                   wandb_run_prefix=None):
+def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, wandb_run=None):
     # Group indices by original sample
     grouped_indices = {}
     for idx, original_idx in enumerate(dataset.original_indices):
@@ -38,16 +37,6 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
     # Stratified K-Fold cross-validation on the training/validation set
     stratified_kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     train_val_stratify_labels = [dataset.labels[grouped_indices[sample_id][0]] for sample_id in train_val_indices]
-
-    # Initialize WandB runs if requested
-    if use_wandb:
-        run = wandb.init(project=wandb_project, name=f"{wandb_run_prefix}_{time.time()}", reinit=True)
-        config_dict = {"epochs": epochs, "batch_size": batch_size, "seed": seed, "type_a": args.type_a, "model": model.__class__.__name__, "feature_type": dataset.feature_type}
-
-        if args.num_outlier_passes >= 0:
-            config_dict["num_outlier_passes"] = args.num_outlier_passes
-
-        wandb.config.update(config_dict)
 
     acc_ls, auroc_ls, aupr_ls, f1_ls = [], [], [], []
     best_model = None
@@ -186,10 +175,23 @@ def sweep_function():
     # train_loader, test_loader = create_dataloaders(dataset)
     # train_model(model, train_loader, test_loader, epochs=100)
 
+    # Initialize WandB runs if requested
+    if args.wandb:
+        run = wandb.init(project=args.wandb_project, name=f"{args.wandb_run_prefix}_{time.time()}", reinit=True)
+        config_dict = {"epochs": args.epochs, "batch_size": args.batch_size, "seed": args.seed, "type_a": args.type_a,
+                       "model": model.__class__.__name__, "feature_type": dataset.feature_type}
+
+        if args.num_outlier_passes >= 0:
+            config_dict["num_outlier_passes"] = args.num_outlier_passes
+
+        wandb.config.update(config_dict)
+
+    else:
+        run = None
+
     # Cross validation
     cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=args.epochs, seed=args.seed,
-                   batch_size=args.batch_size,
-                   use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
+                   batch_size=args.batch_size, use_wandb=args.wandb, wandb_run=run)
 
 
 def main():
@@ -262,10 +264,23 @@ def main():
             # train_loader, test_loader = create_dataloaders(dataset)
             # train_model(model, train_loader, test_loader, epochs=100)
 
+            # Initialize WandB runs if requested
+            if args.wandb:
+                run = wandb.init(project=args.wandb_project, name=f"{args.wandb_run_prefix}_{time.time()}", reinit=True)
+                config_dict = {"epochs": args.epochs, "batch_size": args.batch_size, "seed": seeds[i], "type_a": args.type_a,
+                               "model": model.__class__.__name__, "feature_type": dataset.feature_type}
+
+                if args.num_outlier_passes >= 0:
+                    config_dict["num_outlier_passes"] = args.num_outlier_passes
+
+                wandb.config.update(config_dict)
+
+            else:
+                run = None
+
             # Cross validation
             cross_validate(model, dataset,args, model_type = args.model,  k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
-                           batch_size=args.batch_size,
-                           use_wandb=args.wandb, wandb_project=args.wandb_project, wandb_run_prefix=args.wandb_run_prefix)
+                           batch_size=args.batch_size, use_wandb=args.wandb, wandb_run=run)
 
 
 if __name__ == "__main__":
