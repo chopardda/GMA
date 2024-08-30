@@ -245,6 +245,31 @@ def main():
                     }
                 }
             }
+        elif args.model == "LSTM":
+            sweep_configuration = {
+                "method": "bayes",
+                "metric": {
+                    "name": "Test/Test AUROC",
+                    "goal": "maximize"
+                },
+                "parameters": {
+                    "epochs": {
+                        "values": [50, 100, 150, 200, 250]
+                    },
+                    "batch_size": {
+                        "values": [4, 6, 8]
+                    },
+                    "learning_rate": {
+                        "values": [0.001, 0.0001, 0.00001]
+                    },
+                    "hidden_size": {
+                        "values": [64, 128, 256]
+                    },
+                    "num_layers": {
+                        "values": [1, 2, 3]
+                    }
+                }
+            }
 
         else:
             print("Model not supported for sweeps")
@@ -253,7 +278,11 @@ def main():
         sweep_id = wandb.sweep(sweep_configuration, project=args.wandb_project)
 
         # Start sweep job.
-        wandb.agent(sweep_id, function=sweep_function, count=args.num_sweeps)
+        if args.num_sweeps < 0:
+            wandb.agent(sweep_id, function=sweep_function)
+
+        else:
+            wandb.agent(sweep_id, function=sweep_function, count=args.num_sweeps)
 
     else:
         # Randomly generate a new seed for each iteration
@@ -326,7 +355,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_outlier_passes", type=int, default=-1, help="Number of outlier passes")
     parser.add_argument("--feature_type", type=str, default='coordinates', help="Type of input features. Choose between 'coordinates', 'angles', or 'both'")
     parser.add_argument("--sweep", action='store_true', default=False, help="Do sweeps")
-    parser.add_argument("--num_sweeps", type=int, default=10, help="Number of sweeps to run")
+    parser.add_argument("--num_sweeps", type=int, default=-1, help="Number of sweeps to run")
     args = parser.parse_args()
     set_seeds(args.seed)
     main()
