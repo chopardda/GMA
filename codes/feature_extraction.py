@@ -225,7 +225,7 @@ def main():
             }
         elif args.model == "CNN":
             sweep_configuration = {
-                "method": "bayes",
+                "method": "grid",
                 "metric": {
                     "name": "Test/Test AUROC",
                     "goal": "maximize"
@@ -247,7 +247,7 @@ def main():
             }
         elif args.model == "LSTM":
             sweep_configuration = {
-                "method": "bayes",
+                "method": "grid",
                 "metric": {
                     "name": "Test/Test AUROC",
                     "goal": "maximize"
