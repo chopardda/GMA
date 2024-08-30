@@ -174,7 +174,7 @@ def sweep_function():
     elif args.model == 'LSTM':
         model = LSTMModel(input_size=dataset.min_dim_size)
     elif args.model == 'RF':
-        model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
+        model = RandomForestClassifier(n_estimators=wandb.config.estimators, random_state=args.seed)
     else:
         print("Model undefined")
         exit(-1)
