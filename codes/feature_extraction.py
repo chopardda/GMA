@@ -193,7 +193,7 @@ def sweep_function():
 
     # Cross validation
     cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=args.epochs, seed=args.seed,
-                   batch_size=args.batch_size, use_wandb=args.wandb, wandb_run=run)
+                   batch_size=args.batch_size, use_wandb=args.wandb, run=run)
 
 
 def main():
@@ -282,7 +282,7 @@ def main():
 
             # Cross validation
             cross_validate(model, dataset,args, model_type = args.model,  k_folds=args.folds, epochs=args.epochs, seed=seeds[i],
-                           batch_size=args.batch_size, use_wandb=args.wandb, wandb_run=run)
+                           batch_size=args.batch_size, use_wandb=args.wandb, run=run)
 
 
 if __name__ == "__main__":
