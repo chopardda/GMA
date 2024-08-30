@@ -16,7 +16,7 @@ import time
 import matplotlib.pyplot as plt
 
 
-def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, run=None):
+def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=10, seed=42, batch_size=64, use_wandb=False, run=None, wandb_config=None):
     # Group indices by original sample
     grouped_indices = {}
     for idx, original_idx in enumerate(dataset.original_indices):
@@ -84,7 +84,7 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
             train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
 
             acc, auroc, aupr, f1 = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb,
-                                                     fold=fold)
+                                                     fold=fold, wandb_config=wandb_config)
         acc_ls.append(acc)
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
@@ -162,11 +162,11 @@ def sweep_function():
     # Set model
     if args.model == 'CNN':
         if dataset.feature_type == 'both':
-            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
+            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, wandb_config=wandb.config)
         elif dataset.feature_type == 'angles':
-            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
+            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, wandb_config=wandb.config)
         else:
-            model = CNN1D(sequence_length=dataset.min_dim_size)
+            model = CNN1D(sequence_length=dataset.min_dim_size, wandb_config=wandb.config)
     elif args.model == 'LSTM':
         model = LSTMModel(input_size=dataset.min_dim_size)
     elif args.model == 'RF':
@@ -183,7 +183,7 @@ def sweep_function():
     # train_model(model, train_loader, test_loader, epochs=100)
 
     if args.wandb:
-        config_dict = {"epochs": args.epochs, "batch_size": args.batch_size, "seed": args.seed, "type_a": args.type_a,
+        config_dict = {"epochs": wandb.config.epochs, "batch_size": wandb.config.batch_size, "seed": args.seed, "type_a": args.type_a,
                        "model": model.__class__.__name__, "feature_type": dataset.feature_type}
 
         if args.num_outlier_passes >= 0:
@@ -192,8 +192,8 @@ def sweep_function():
         wandb.config.update(config_dict)
 
     # Cross validation
-    cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=args.epochs, seed=args.seed,
-                   batch_size=args.batch_size, use_wandb=args.wandb, run=run)
+    cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=wandb.config.epochs, seed=args.seed,
+                   batch_size=wandb.config.batch_size, use_wandb=args.wandb, run=run, wandb_config=wandb.config)
 
 
 def main():
@@ -223,6 +223,28 @@ def main():
                     }
                 }
             }
+        elif args.model == "CNN":
+            sweep_configuration = {
+                "method": "bayes",
+                "metric": {
+                    "name": "Test/Test AUROC",
+                    "goal": "maximize"
+                },
+                "parameters": {
+                    "epochs": {
+                        "values": [50, 100, 150, 200, 250]
+                    },
+                    "batch_size": {
+                        "values": [4, 6, 8]
+                    },
+                    "learning_rate": {
+                        "values": [0.001, 0.0001, 0.00001]
+                    },
+                    "out_features": {
+                        "values": [50, 100, 150]
+                    }
+                }
+            }
 
         else:
             print("Model not supported for sweeps")
@@ -231,7 +253,7 @@ def main():
         sweep_id = wandb.sweep(sweep_configuration, project=args.wandb_project)
 
         # Start sweep job.
-        wandb.agent(sweep_id, function=sweep_function, count=10)
+        wandb.agent(sweep_id, function=sweep_function, count=args.num_sweeps)
 
     else:
         # Randomly generate a new seed for each iteration
@@ -304,6 +326,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_outlier_passes", type=int, default=-1, help="Number of outlier passes")
     parser.add_argument("--feature_type", type=str, default='coordinates', help="Type of input features. Choose between 'coordinates', 'angles', or 'both'")
     parser.add_argument("--sweep", action='store_true', default=False, help="Do sweeps")
+    parser.add_argument("--num_sweeps", type=int, default=10, help="Number of sweeps to run")
     args = parser.parse_args()
     set_seeds(args.seed)
     main()
