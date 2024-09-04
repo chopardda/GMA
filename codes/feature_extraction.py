@@ -84,7 +84,7 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
             train_loader, val_loader = create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=batch_size)
 
             acc, auroc, aupr, f1 = train_model(model, train_loader, val_loader, epochs=epochs, use_wandb=use_wandb,
-                                                     fold=fold, wandb_config=wandb_config)
+                                                     fold=fold, wandb_config=wandb_config, lr_input=args.lr)
         acc_ls.append(acc)
         auroc_ls.append(auroc)
         aupr_ls.append(aupr)
@@ -371,6 +371,7 @@ if __name__ == "__main__":
     parser.add_argument("--feature_type", type=str, default='coordinates', help="Type of input features. Choose between 'coordinates', 'angles', or 'both'")
     parser.add_argument("--sweep", action='store_true', default=False, help="Do sweeps")
     parser.add_argument("--num_sweeps", type=int, default=-1, help="Number of sweeps to run")
+    parser.add_argument("--lr", type=float, default=0.00001, help="Learning rate for training")
     args = parser.parse_args()
     set_seeds(args.seed)
     main()

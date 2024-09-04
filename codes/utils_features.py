@@ -210,11 +210,15 @@ class CustomDataset(Dataset):
         return torch.tensor(feature, dtype=torch.float32), label
 
 
-def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fold=None, wandb_config=None):
+def train_model(model, train_loader, test_loader, epochs=10, use_wandb=False, fold=None, wandb_config=None, lr_input=None):
     run_name = "" if fold is None else f"Fold_{fold + 1}"
     criterion = nn.BCELoss()
 
-    lr = 0.00001 if wandb_config is None else wandb_config.learning_rate
+    if lr_input is not None:
+        lr = lr_input
+    else:
+        lr = 0.00001 if wandb_config is None else wandb_config.learning_rate
+
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
 
     for epoch in range(epochs):
