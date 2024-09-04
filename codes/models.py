@@ -27,7 +27,7 @@ class LSTMModel(nn.Module):
 
 
 class CNN1D(nn.Module):
-    def __init__(self, sequence_length = 467, input_size = 34, num_classes = 1, wandb_config=None):
+    def __init__(self, sequence_length = 467, input_size = 34, num_classes = 1, out_features=100, wandb_config=None):
         super(CNN1D, self).__init__()
         self.conv1 = nn.Conv1d(in_channels=input_size, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
@@ -37,8 +37,8 @@ class CNN1D(nn.Module):
             self.fc1 = nn.Linear(128 * (sequence_length // 4), wandb_config.out_features)  # Adjust this based on the pooling
             self.fc2 = nn.Linear(wandb_config.out_features, num_classes)
         else:
-            self.fc1 = nn.Linear(128 * (sequence_length // 4), 100)  # Adjust this based on the pooling
-            self.fc2 = nn.Linear(100, num_classes)
+            self.fc1 = nn.Linear(128 * (sequence_length // 4), out_features)  # Adjust this based on the pooling
+            self.fc2 = nn.Linear(out_features, num_classes)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):

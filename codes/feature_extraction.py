@@ -312,15 +312,15 @@ def main():
             # Set model
             if args.model == 'CNN':
                 if dataset.feature_type == 'both':
-                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44)
+                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, out_features=args.out_features)
                 elif dataset.feature_type == 'angles':
-                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10)
+                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, out_features=args.out_features)
                 else:
-                    model = CNN1D(sequence_length=dataset.min_dim_size)
+                    model = CNN1D(sequence_length=dataset.min_dim_size, out_features=args.out_features)
             elif args.model == 'LSTM':
-                model = LSTMModel(input_size=dataset.min_dim_size)
+                model = LSTMModel(input_size=dataset.min_dim_size, hidden_size=args.hidden_size, num_layers=args.num_layers)
             elif args.model == 'RF':
-                model = RandomForestClassifier(n_estimators=100, random_state=args.seed)
+                model = RandomForestClassifier(n_estimators=args.estimators, random_state=args.seed)
             else:
                 print("Model undefined")
                 exit(-1)
@@ -372,6 +372,10 @@ if __name__ == "__main__":
     parser.add_argument("--sweep", action='store_true', default=False, help="Do sweeps")
     parser.add_argument("--num_sweeps", type=int, default=-1, help="Number of sweeps to run")
     parser.add_argument("--lr", type=float, default=0.00001, help="Learning rate for training")
+    parser.add_argument("--hidden_size", type=int, default=128, help="Hidden size for LSTM model")
+    parser.add_argument("--num_layers", type=int, default=2, help="Number of layers for LSTM model")
+    parser.add_argument("--out_features", type=int, default=100, help="Number of output features for CNN model")
+    parser.add_argument("--estimators", type=int, default=100, help="Number of estimators for RF model")
     args = parser.parse_args()
     set_seeds(args.seed)
     main()
