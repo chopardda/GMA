@@ -203,7 +203,11 @@ def sweep_function():
         wandb.config.update(config_dict)
 
     # Cross validation
-    cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=wandb.config.epochs, seed=args.seed,
+    if args.model == "RF":
+        cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, seed=args.seed, use_wandb=args.wandb, run=run, wandb_config=wandb.config)
+
+    else:
+        cross_validate(model, dataset, args, model_type=args.model, k_folds=args.folds, epochs=wandb.config.epochs, seed=args.seed,
                    batch_size=wandb.config.batch_size, use_wandb=args.wandb, run=run, wandb_config=wandb.config)
 
 
