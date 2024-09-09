@@ -69,7 +69,7 @@ escape: Not an outlier
 --tracked_kp_path /path/to/tracked/keypoint_files
 --labeled_kp_path /path/to/labeled/keypoint_files
 --missing_ok 
---video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos 
+--video_path /path/to/your/videos  
 --output_path ./output/relabeled
 `
 For each frame that pops up, relabel the outlier point, as well as any other incorrect points as needed. To do this, click on the point to be relabeled, and then click on the correct point in the video. Press enter when finished with that frame.
