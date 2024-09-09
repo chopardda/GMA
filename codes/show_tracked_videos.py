@@ -17,7 +17,7 @@ parser.add_argument("--missing_ok", default=False, action="store_true", help="Al
 
 args = parser.parse_args()
 
-video_folder = "/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos"
+video_folder = "/path/to/videos"
 
 video_manager = VideoManager()
 video_manager.add_all_videos(video_folder, add_pt_data=True)  # Load class data, not the videos themselves

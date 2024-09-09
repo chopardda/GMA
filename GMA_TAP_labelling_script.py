@@ -23,7 +23,7 @@ body_keypoints = ['0. head top',
 MAX_N_POINTS = len(body_keypoints)
 
 # --- Load video
-video = media.read_video('/home/daphne/Documents/GMA/data/Preprocessed_Videos/AI_GeMo_late_F-/35_F-_2_c.mp4')
+video = media.read_video('/path/to/video.mp4')
 height, width = video.shape[1:3]
 media.show_video(video, fps=30)
 

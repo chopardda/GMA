@@ -1,10 +1,13 @@
+# Automatic Classification of General Movements in Newborns
+This repository includes the instruction and code for the paper "_Automatic Classification of General Movements in Newborns_" submitted to the AHLI Machine Learning for Health (ML4H) Symposium 2024.
+
 ## Set up environment
 Setting up jax to work with GPU is a bit tricky:
 1. Create conda environment: `conda env create -f environment.yml`
 2. Install jax with GPU support: `pip install --upgrade pip`, `pip install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html`
 3. Install other dependencies: `pip install -r requirements.txt`
 
-Note that the environment variable `XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1` might need to be set, if the CUDA version does not match exactly
+Note that the environment variable `XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1` might need to be set, if the CUDA version does not match exactly.
 
 
 
@@ -49,7 +52,7 @@ Removing outliers is an iterative process involving the `identify_outliers_scrip
 --show_outliers
 --tracked_kp_path /path/to/tracked/keypoint_files
 --missing_ok 
---video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos 
+--video_path /path/to/your/videos 
 --stddev_threshold 20
 `
 When presented with a potential outlier, use the following keys to label it:
@@ -70,13 +73,13 @@ escape: Not an outlier
 --output_path ./output/relabeled
 `
 For each frame that pops up, relabel the outlier point, as well as any other incorrect points as needed. To do this, click on the point to be relabeled, and then click on the correct point in the video. Press enter when finished with that frame.
-3. Delete the `./output/outliers` directory and the `./keypoints_distributgions.pkl` file
+3. Delete the `./output/outliers` directory and the `./keypoints_distributgions.pkl` file.
 
 4. Rerun the tracking process, using the relabled data as labeled input. e.g.:
 `
-python main.py --task all_body_keypoints --video_path /cluster/work/vogtlab/Projects/General_Movements/Cropped_Videos  --labeled_kp_path ./output/relabeled --tracked_kp_path ./output/tracked_relabeled --missing_ok --track_only
+python main.py --task all_body_keypoints --video_path /path/to/your/videos  --labeled_kp_path ./output/relabeled --tracked_kp_path ./output/tracked_relabeled --missing_ok --track_only
 `
-5. Rerun steps 1-4, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on
+5. Rerun steps 1-4, using `./output/relabeled` as the labeled_kp_path and `./output/tracked_relabeled` as the tracked_kp_path, and so on.
 6. After you are satisfied, the final tracked keypoints located at the path provided to the `--tracked_kp_path` flag in the last iteration can be used for further analysis.
 
 
