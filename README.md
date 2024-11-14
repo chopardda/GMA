@@ -1,5 +1,5 @@
 # Automatic Classification of General Movements in Newborns
-This repository includes the instruction and code for the paper "_Automatic Classification of General Movements in Newborns_" submitted to the AHLI Machine Learning for Health (ML4H) Symposium 2024.
+This repository includes the instruction and code for the paper "_Automatic Classification of General Movements in Newborns_" presented at the AHLI Machine Learning for Health (ML4H) Symposium 2024.
 
 ## Set up environment
 Setting up jax to work with GPU is a bit tricky:
@@ -101,3 +101,15 @@ You can modify the parameters for the training with the following flags:
 - `--model`: Model architecture to use for training
 - `--wandb`: Save logs to cluster local WandB instance. It must be set up correctly
 - `--num_iterations`: Number of full cross validation iterations to run
+
+## Citing
+To cite this work please use the following BibTEX entry:
+
+```
+@inproceedings{
+chopard2024GMA,
+title={Automatic Classification of General Movements in Newborns},
+author={Chopard, Daphne and Laguna, Sonia and Chin-Cheoung, Kieran and Dietz, Annika and Badura, Anna and Wellmann, Sven and Vogt, Julia E},
+booktitle={Findings of the AHLI Machine Learning for Health (ML4H) Symposium},
+year={2024}
+}
