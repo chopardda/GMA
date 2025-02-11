@@ -33,7 +33,7 @@ def create_dataloaders_Kfold(train_indices, val_indices, dataset, batch_size=16)
 
 
 class CustomDataset(Dataset):
-    def __init__(self, directory, type_a='late', feature_type='coordinates'):
+    def __init__(self, directory, type_a='late', feature_type='coordinates', label_method=None):
         """
         Args:
             directory (str): Directory where the tracked points are stored.
@@ -49,25 +49,52 @@ class CustomDataset(Dataset):
 
         self.feature_type = feature_type
 
-        keypoints = [
-            "nose",
-            "left wrist",
-            "right elbow",
-            "left elbow",
-            "left ankle",
-            "head bottom",
-            "head top",
-            "right wrist",
-            "left hip",
-            "right shoulder",
-            "right hip",
-            "left shoulder",
-            "left knee",
-            "right ear",
-            "right ankle",
-            "left ear",
-            "right knee"
-        ]
+        if label_method is None:
+            keypoints = [
+                "nose",
+                "left wrist",
+                "right elbow",
+                "left elbow",
+                "left ankle",
+                "head bottom",
+                "head top",
+                "right wrist",
+                "left hip",
+                "right shoulder",
+                "right hip",
+                "left shoulder",
+                "left knee",
+                "right ear",
+                "right ankle",
+                "left ear",
+                "right knee"
+            ]
+
+        elif label_method == 'aggpose':
+            keypoints = [
+                "joint_0",
+                "joint_1",
+                "joint_2",
+                "joint_3",
+                "joint_4",
+                "joint_5",
+                "joint_6",
+                "joint_7",
+                "joint_8",
+                "joint_9",
+                "joint_10",
+                "joint_11",
+                "joint_12",
+                "joint_13",
+                "joint_14",
+                "joint_15",
+                "joint_16",
+                "joint_17",
+                "joint_18",
+                "joint_19",
+                "joint_20"
+            ]
+
 
         all_data = []
         labels = []
@@ -89,9 +116,11 @@ class CustomDataset(Dataset):
 
                 filepath = os.path.join(directory, filename)
                 data = pd.read_csv(filepath, header=0)
+
                 # Masking out the points where visible is False
                 data.loc[~data['visible'], ['x', 'y']] = 0
 
+                # if label_method is None:
                 # Check for missing keypoints
                 existing_keypoints = set(data['keypoint'])
                 missing_keypoints = [kp for kp in keypoints if kp not in existing_keypoints]
@@ -111,6 +140,7 @@ class CustomDataset(Dataset):
 
                 data_order_x = data.pivot(index='keypoint', columns='frame_index', values='x').fillna(0)
                 data_order_y = data.pivot(index='keypoint', columns='frame_index', values='y').fillna(0)
+
                 combined_data = None
 
                 if self.feature_type == 'coordinates' or self.feature_type == 'both':
@@ -120,7 +150,7 @@ class CustomDataset(Dataset):
 
                 if self.feature_type == 'angles' or self.feature_type == 'both':
                     # Compute angles between certain keypoints
-                    angles = self.compute_angles(data_order_x, data_order_y, keypoints)
+                    angles = self.compute_angles(data_order_x, data_order_y, keypoints, label_method)
                     angles_tensor = torch.tensor(angles)  # Add a dimension to match combined_data
                     if combined_data is None:
                         combined_data = angles_tensor
@@ -150,20 +180,34 @@ class CustomDataset(Dataset):
         self.labels = torch.tensor(new_labels)
         self.original_indices = original_indices
 
-    def compute_angles(self, data_order_x, data_order_y, keypoints):
+    def compute_angles(self, data_order_x, data_order_y, keypoints, label_method=None):
         # Define pairs of keypoints for which angles will be calculated
-        angle_pairs = [
-            ("head top", "nose", "head bottom"),  # head top to neck angle
-            ("right ear", "nose", "left ear"),  # left to right ear angle
-            ("left elbow", "left shoulder", "head bottom"),  # head to shoulder angle
-            ("right elbow", "right shoulder", "head bottom"),  # head to shoulder angle
-            ("left wrist", "left elbow", "left shoulder"),  # left elbow angle
-            ("right wrist", "right elbow", "right shoulder"),  # right elbow angle
-            ("left knee", "left hip", "left shoulder"),  # left hip angle
-            ("right knee", "right hip", "right shoulder"),  # right hip angle
-            ("left hip", "left knee", "left ankle"),  # left knee angle
-            ("right hip", "right knee", "right ankle")  # right knee angle
-        ]
+        if label_method is None:
+            angle_pairs = [
+                ("head top", "nose", "head bottom"),  # head top to neck angle
+                ("right ear", "nose", "left ear"),  # left to right ear angle
+                ("left elbow", "left shoulder", "head bottom"),  # head to shoulder angle
+                ("right elbow", "right shoulder", "head bottom"),  # head to shoulder angle
+                ("left wrist", "left elbow", "left shoulder"),  # left elbow angle
+                ("right wrist", "right elbow", "right shoulder"),  # right elbow angle
+                ("left knee", "left hip", "left shoulder"),  # left hip angle
+                ("right knee", "right hip", "right shoulder"),  # right hip angle
+                ("left hip", "left knee", "left ankle"),  # left knee angle
+                ("right hip", "right knee", "right ankle")  # right knee angle
+            ]
+        elif label_method == "aggpose":
+            angle_pairs = [
+                ("joint_19", "joint_18", "joint_0"),  # head top to neck angle
+                ("joint_19", "joint_18", "joint_9"),  # left to right ear angle
+                ("joint_2", "joint_1", "joint_19"),  # head to shoulder angle
+                ("joint_11", "joint_10", "joint_19"),  # head to shoulder angle
+                ("joint_3", "joint_2", "joint_1"),  # left elbow angle
+                ("joint_12", "joint_11", "joint_10"),  # right elbow angle
+                ("joint_15", "joint_14", "joint_10"),  # left hip angle
+                ("joint_6", "joint_5", "joint_1"),  # right hip angle
+                ("joint_14", "joint_15", "joint_16"),  # left knee angle
+                ("joint_5", "joint_6", "joint_7")  # right knee angle
+            ]
 
         angles = []
 

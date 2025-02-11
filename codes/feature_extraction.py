@@ -160,13 +160,20 @@ def sweep_function():
     dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
 
     # Set model
-    if args.model == 'CNN':
-        if dataset.feature_type == 'both':
-            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, wandb_config=wandb.config)
-        elif dataset.feature_type == 'angles':
-            model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, wandb_config=wandb.config)
-        else:
-            model = CNN1D(sequence_length=dataset.min_dim_size, wandb_config=wandb.config)
+    if args.model == 'CNN': #TODO change
+        input_size = dataset.features[0].shape[0]
+        # if dataset.feature_type == 'both':
+        #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, out_features=args.out_features)
+        # elif dataset.feature_type == 'angles':
+        #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, out_features=args.out_features)
+        # else:
+        model = CNN1D(sequence_length=dataset.min_dim_size, input_size=input_size, out_features=args.out_features)
+        # if dataset.feature_type == 'both':
+        #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, wandb_config=wandb.config)
+        # elif dataset.feature_type == 'angles':
+        #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, wandb_config=wandb.config)
+        # else:
+        #     model = CNN1D(sequence_length=dataset.min_dim_size, wandb_config=wandb.config)
     elif args.model == 'LSTM':
         model = LSTMModel(input_size=dataset.min_dim_size)
     elif args.model == 'RF':
@@ -307,16 +314,17 @@ def main():
         for i in range(args.num_iterations):
             set_seeds(seeds[i])
             # Create dataset
-            dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
+            dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type, label_method=args.label_method)
 
             # Set model
             if args.model == 'CNN':
-                if dataset.feature_type == 'both':
-                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, out_features=args.out_features)
-                elif dataset.feature_type == 'angles':
-                    model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, out_features=args.out_features)
-                else:
-                    model = CNN1D(sequence_length=dataset.min_dim_size, out_features=args.out_features)
+                input_size = dataset.features[0].shape[0]
+                # if dataset.feature_type == 'both':
+                #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=44, out_features=args.out_features)
+                # elif dataset.feature_type == 'angles':
+                #     model = CNN1D(sequence_length=dataset.min_dim_size, input_size=10, out_features=args.out_features)
+                # else:
+                model = CNN1D(sequence_length=dataset.min_dim_size, input_size=input_size, out_features=args.out_features)
             elif args.model == 'LSTM':
                 model = LSTMModel(input_size=dataset.min_dim_size, hidden_size=args.hidden_size, num_layers=args.num_layers)
             elif args.model == 'RF':
@@ -337,6 +345,12 @@ def main():
                 run = wandb.init(project=args.wandb_project, name=f"{args.wandb_run_prefix}_{time.time()}", reinit=True)
                 config_dict = {"epochs": args.epochs, "batch_size": args.batch_size, "seed": seeds[i], "type_a": args.type_a,
                                "model": model.__class__.__name__, "feature_type": dataset.feature_type}
+
+                if args.model == "CNN" or args.model == "LSTM":
+                    config_dict['learning_rate'] = args.lr
+
+                    if args.model == "CNN":
+                        config_dict['out_features'] = args.out_features
 
                 if args.num_outlier_passes >= 0:
                     config_dict["num_outlier_passes"] = args.num_outlier_passes
@@ -376,6 +390,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_layers", type=int, default=2, help="Number of layers for LSTM model")
     parser.add_argument("--out_features", type=int, default=100, help="Number of output features for CNN model")
     parser.add_argument("--estimators", type=int, default=100, help="Number of estimators for RF model")
+    parser.add_argument("--label_method", type=str, default=None, help="Where the labels come from (None or aggpose)")
     args = parser.parse_args()
     set_seeds(args.seed)
     main()
