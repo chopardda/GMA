@@ -101,6 +101,7 @@ class CustomDataset(Dataset):
         original_indices = []  # To track the original sample index for each chunk
         seen_samples = set()  # To track seen samples and avoid duplicates of same subject
         group_identifiers = defaultdict(list) 
+        
         for idx, filename in enumerate(os.listdir(directory)):
             if filename.endswith(".csv") and (negative in filename or positive in filename):
 
