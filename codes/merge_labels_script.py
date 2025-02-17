@@ -18,7 +18,7 @@ parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'
                     help='Task for labeling keypoints.')
 parser.add_argument("--accept_single", action="store_true", default=True, help="Accept single label sets")
 parser.add_argument('--video_folder',
-                    default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    default='video_path',
                     help='Path to directory containing videos.')
 parser.add_argument('--labeled_kp_path', default='./output/labeled',
                     help='Path to directory containing merged labelled keypoints to use for cropping.')

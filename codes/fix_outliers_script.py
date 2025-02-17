@@ -21,7 +21,7 @@ parser.add_argument('--task', choices=['extreme_keypoints', 'all_body_keypoints'
                     help='Task for labeling keypoints.')
 parser.add_argument('--output_path', default='./output/relabeled',
                     help='Path to output directory for saving labelled data files.')
-parser.add_argument('--video_path', default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+parser.add_argument('--video_path', default='videos_path',
                     help='Path to folder containing videos.')
 parser.add_argument('--auto_only', default=False, action="store_true", help="Only correct auto-detected outliers")
 

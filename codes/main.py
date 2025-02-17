@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--crop_resize_only', action='store_true',
                         help='Crop and resize videos only')
     parser.add_argument('--video_path',
-                        default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                        default='video_path',
                         help='Path to directory containing videos.')
     parser.add_argument('--labeled_kp_path', default='./output/merged',
                         help='Path to directory containing merged labelled keypoints to use for cropping.')

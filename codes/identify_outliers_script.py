@@ -26,7 +26,7 @@ parser.add_argument('--tracked_kp_path', default='./output/tracked',
                     help='Path to tracked keypoints')
 parser.add_argument("--missing_ok", default=False, action="store_true", help="Allow missing tracking info")
 parser.add_argument('--video_path',
-                    default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+                    default='video_path',
                     help='Path to directory containing videos.')
 
 args = parser.parse_args()

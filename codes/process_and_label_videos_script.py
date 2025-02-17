@@ -22,7 +22,7 @@ parser.add_argument('--relabel', action='store_true', default=False,
                     help='Specifies whether to relabel keypoints in videos that are already labeled. '
                          'If set, videos with existing labels will be labeled one more time with a different filename. '
                          'By default, existing labels in videos are preserved and not replaced.')
-parser.add_argument('--video_path', default='/cluster/work/vogtlab/Projects/General_Movements/Preprocessed_Videos',
+parser.add_argument('--video_path', default='video_path',
                     help='Path to folder containing videos.')
 parser.add_argument('--output_path', default='./output/labeled',
                     help='Path to output directory for saving labelled data files.')
