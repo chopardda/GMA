@@ -1,5 +1,5 @@
 # Automatic Classification of General Movements in Newborns
-This repository includes the instruction and code for the paper "_Automatic Classification of General Movements in Newborns_" presented at the AHLI Machine Learning for Health (ML4H) Symposium 2024.
+This repository includes the instruction and code for the paper "_Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings_" submitted to ICLR 2025 Workshop AI4CHL.
 
 ## Set up environment
 Setting up jax to work with GPU is a bit tricky:
