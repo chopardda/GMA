@@ -101,6 +101,7 @@ You can modify the parameters for the training with the following flags:
 - `--model`: Model architecture to use for training
 - `--wandb`: Save logs to cluster local WandB instance. It must be set up correctly
 - `--num_iterations`: Number of full cross validation iterations to run
+- `--label_method`: Type of keypoint label extraction. Options: `aggpose` or `None`
 
 ## Citing
 To cite this work please use the following BibTEX entry:

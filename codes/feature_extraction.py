@@ -90,6 +90,15 @@ def cross_validate(model, dataset, args, model_type = 'CNN', k_folds=5, epochs=1
         aupr_ls.append(aupr)
         f1_ls.append(f1)
 
+        # LOG PER-FOLD METRICS IN WANDB
+        if use_wandb:
+            wandb.log({
+            f"Evaluation/Fold_{fold}_Eval_Accuracy": acc,
+            f"Evaluation/Fold_{fold}_Eval_AUROC": auroc,
+            f"Evaluation/Fold_{fold}_Eval_AUPR": aupr,
+            f"Evaluation/Fold_{fold}_Eval_F1-score": f1,
+        })
+
         if auroc > best_val_auroc:
             best_val_auroc = auroc
             best_model = model
