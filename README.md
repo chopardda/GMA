@@ -1,4 +1,4 @@
-# Automatic Classification of General Movements in Newborns
+# Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings
 This repository includes the instruction and code for the paper "_Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings_" submitted to ICLR 2025 Workshop AI4CHL.
 
 ## Set up environment
