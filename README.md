@@ -1,5 +1,5 @@
 # Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings
-This repository includes the instruction and code for the paper "_Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings_" submitted to ICLR 2025 Workshop AI4CHL.
+This repository includes the instruction and code for the paper "_Towards Scalable Newborn Screening: Automated General Movement Assessment in Uncontrolled Settings_" submitted to Machine Learning for Healthcare (MLHC) 2025.
 
 ## Set up environment
 Setting up jax to work with GPU is a bit tricky:
