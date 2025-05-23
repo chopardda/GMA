@@ -157,7 +157,7 @@ def sweep_function():
     else:
         run = None
 
-    dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type)
+    dataset = CustomDataset(args.directory, args.type_a, feature_type=args.feature_type, label_method=args.label_method)
 
     # Set model
     if args.model == 'CNN': #TODO change
